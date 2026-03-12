@@ -121,9 +121,10 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 			requestPath = "/v1/images/generations"
 		}
 
-		// responses-only models
-		if strings.Contains(strings.ToLower(testModel), "codex") {
+		// responses-only models (also allow explicit suffix for upstreams that only expose Responses API)
+		if strings.Contains(strings.ToLower(testModel), "codex") || strings.HasSuffix(testModel, "-responses") {
 			requestPath = "/v1/responses"
+			// Keep suffix as a routing hint; it will be stripped before building the request.
 		}
 
 		// responses compaction models (must use /v1/responses/compact)
@@ -194,6 +195,13 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 	} else {
 		// 根据请求路径自动检测
 		relayFormat = types.RelayFormatOpenAI
+		// Allow forcing responses-mode in channel tests via model name suffix.
+		// Some upstreams only expose the /v1/responses API.
+		if strings.HasSuffix(testModel, "-responses") {
+			relayFormat = types.RelayFormatOpenAIResponses
+			// Strip suffix before building request; it's a local routing hint.
+			testModel = strings.TrimSuffix(testModel, "-responses")
+		}
 		if c.Request.URL.Path == "/v1/embeddings" {
 			relayFormat = types.RelayFormatEmbedding
 		}
@@ -218,6 +226,12 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 	}
 
 	request := buildTestRequest(testModel, endpointType, channel, isStream)
+	// If we forced responses mode by model suffix, ensure relayFormat matches the request type
+	// and that the built request is a Responses request.
+	if strings.HasSuffix(testModel, "-responses") {
+		relayFormat = types.RelayFormatOpenAIResponses
+		request = buildTestRequest(testModel, string(constant.EndpointTypeOpenAIResponse), channel, isStream)
+	}
 
 	info, err := relaycommon.GenRelayInfo(c, relayFormat, request, nil)
 
@@ -692,8 +706,9 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 		}
 	}
 
-	// Responses-only models (e.g. codex series)
-	if strings.Contains(strings.ToLower(model), "codex") {
+	// Responses-only models (e.g. codex series) or explicit "-responses" suffix.
+	if strings.Contains(strings.ToLower(model), "codex") || strings.HasSuffix(model, "-responses") {
+		model = strings.TrimSuffix(model, "-responses")
 		return &dto.OpenAIResponsesRequest{
 			Model:  model,
 			Input:  json.RawMessage(`[{"role":"user","content":"hi"}]`),
