@@ -94,7 +94,6 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 	endpointType = normalizeChannelTestEndpoint(channel, testModel, endpointType)
 
 	requestPath := "/v1/chat/completions"
-
 	// 如果指定了端点类型，使用指定的端点类型
 	if endpointType != "" {
 		if endpointInfo, ok := common.GetDefaultEndpointInfo(constant.EndpointType(endpointType)); ok {
@@ -404,6 +403,21 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 
 	requestBody := bytes.NewBuffer(jsonData)
 	c.Request.Body = io.NopCloser(bytes.NewBuffer(jsonData))
+
+	// Debug: print curl command
+	{
+		fullURL := info.ChannelBaseUrl
+		if !strings.HasSuffix(fullURL, "/") && !strings.HasPrefix(requestPath, "/") {
+			fullURL += "/"
+		}
+		fullURL += strings.TrimPrefix(requestPath, "/")
+		var curlHeaders []string
+		curlHeaders = append(curlHeaders, fmt.Sprintf(`-H "Authorization: Bearer %s"`, info.ApiKey))
+		curlHeaders = append(curlHeaders, `-H "Content-Type: application/json"`)
+		common.SysLog(fmt.Sprintf("=== Channel Test CURL ===\ncurl -X POST '%s' \\\n  %s \\\n  -d '%s'",
+			fullURL, strings.Join(curlHeaders, " \\\n  "), string(jsonData)))
+	}
+
 	resp, err := adaptor.DoRequest(c, info, requestBody)
 	if err != nil {
 		return testResult{
@@ -496,6 +510,7 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 		Group:            info.UsingGroup,
 		Other:            other,
 	})
+	common.SysLog(fmt.Sprintf("=== Channel Test RESPONSE ===\nBody:\n%s", string(respBody)))
 	common.SysLog(fmt.Sprintf("testing channel #%d, response: \n%s", channel.Id, string(respBody)))
 	return testResult{
 		context:     c,

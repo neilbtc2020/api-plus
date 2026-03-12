@@ -35,7 +35,6 @@ import { useTranslation } from 'react-i18next';
 import {
   IconGithubLogo,
   IconPlay,
-  IconFile,
   IconCopy,
 } from '@douyinfe/semi-icons';
 import { Link } from 'react-router-dom';
@@ -74,7 +73,6 @@ const Home = () => {
   const [noticeVisible, setNoticeVisible] = useState(false);
   const isMobile = useIsMobile();
   const isDemoSiteMode = statusState?.status?.demo_site_enabled || false;
-  const docsLink = statusState?.status?.docs_link || '';
   const serverAddress =
     statusState?.status?.server_address || `${window.location.origin}`;
   const endpointItems = API_ENDPOINTS.map((e) => ({ value: e }));
@@ -231,25 +229,14 @@ const Home = () => {
                       icon={<IconGithubLogo />}
                       onClick={() =>
                         window.open(
-                          'https://github.com/QuantumNous/new-api',
+                          'https://api.apiplus.cloud',
                           '_blank',
                         )
                       }
                     >
                       {statusState.status.version}
                     </Button>
-                  ) : (
-                    docsLink && (
-                      <Button
-                        size={isMobile ? 'default' : 'large'}
-                        className='flex items-center !rounded-3xl px-6 py-2'
-                        icon={<IconFile />}
-                        onClick={() => window.open(docsLink, '_blank')}
-                      >
-                        {t('文档')}
-                      </Button>
-                    )
-                  )}
+                  ) : null}
                 </div>
 
                 {/* 框架兼容性图标 */}
