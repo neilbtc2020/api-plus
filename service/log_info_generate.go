@@ -74,6 +74,7 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	appendRequestPath(ctx, relayInfo, other)
 	appendRequestConversionChain(relayInfo, other)
 	appendBillingInfo(relayInfo, other)
+	appendUpstreamInfo(relayInfo, other)
 	return other
 }
 
@@ -159,6 +160,27 @@ func appendRequestConversionChain(relayInfo *relaycommon.RelayInfo, other map[st
 	other["request_conversion"] = chain
 }
 
+func appendUpstreamInfo(relayInfo *relaycommon.RelayInfo, other map[string]interface{}) {
+	if relayInfo == nil || other == nil {
+		return
+	}
+	if relayInfo.UpstreamStatusCode != 0 {
+		other["upstream_status_code"] = relayInfo.UpstreamStatusCode
+	}
+	if relayInfo.UpstreamLatencyMs > 0 {
+		other["upstream_latency_ms"] = relayInfo.UpstreamLatencyMs
+	}
+	if relayInfo.UpstreamPath != "" {
+		other["upstream_path"] = relayInfo.UpstreamPath
+	}
+	if relayInfo.UpstreamHost != "" {
+		other["upstream_host"] = relayInfo.UpstreamHost
+	}
+	if relayInfo.UpstreamError != "" {
+		other["upstream_error"] = relayInfo.UpstreamError
+	}
+}
+
 func GenerateWssOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.RealtimeUsage, modelRatio, groupRatio, completionRatio, audioRatio, audioCompletionRatio, modelPrice, userGroupRatio float64) map[string]interface{} {
 	info := GenerateTextOtherInfo(ctx, relayInfo, modelRatio, groupRatio, completionRatio, 0, 0.0, modelPrice, userGroupRatio)
 	info["ws"] = true
@@ -212,5 +234,6 @@ func GenerateMjOtherInfo(relayInfo *relaycommon.RelayInfo, priceData types.Price
 		other["user_group_ratio"] = priceData.GroupRatioInfo.GroupSpecialRatio
 	}
 	appendRequestPath(nil, relayInfo, other)
+	appendUpstreamInfo(relayInfo, other)
 	return other
 }

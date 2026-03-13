@@ -88,14 +88,16 @@ const (
 )
 
 type NewAPIError struct {
-	Err            error
-	RelayError     any
-	skipRetry      bool
-	recordErrorLog *bool
-	errorType      ErrorType
-	errorCode      ErrorCode
-	StatusCode     int
-	Metadata       json.RawMessage
+	Err                        error
+	RelayError                 any
+	skipRetry                  bool
+	recordErrorLog             *bool
+	errorType                  ErrorType
+	errorCode                  ErrorCode
+	StatusCode                 int
+	Metadata                   json.RawMessage
+	UpstreamErrorBody          string
+	UpstreamErrorBodyTruncated bool
 }
 
 // Unwrap enables errors.Is / errors.As to work with NewAPIError by exposing the underlying error.
@@ -175,6 +177,21 @@ func (e *NewAPIError) MaskSensitiveErrorWithStatusCode() string {
 
 func (e *NewAPIError) SetMessage(message string) {
 	e.Err = errors.New(message)
+}
+
+const maxUpstreamErrorBodyLen = 2048
+
+func (e *NewAPIError) SetUpstreamErrorBody(body []byte) {
+	if e == nil || len(body) == 0 {
+		return
+	}
+	masked := common.MaskSensitiveInfo(string(body))
+	if len(masked) > maxUpstreamErrorBodyLen {
+		e.UpstreamErrorBody = masked[:maxUpstreamErrorBodyLen]
+		e.UpstreamErrorBodyTruncated = true
+		return
+	}
+	e.UpstreamErrorBody = masked
 }
 
 func (e *NewAPIError) ToOpenAIError() OpenAIError {

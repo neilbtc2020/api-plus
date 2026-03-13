@@ -56,6 +56,13 @@ const (
 
 	ContextKeySystemPromptOverride ContextKey = "system_prompt_override"
 
+	// Upstream observability keys (relay)
+	ContextKeyUpstreamStatusCode ContextKey = "upstream_status_code"
+	ContextKeyUpstreamLatencyMs  ContextKey = "upstream_latency_ms"
+	ContextKeyUpstreamPath       ContextKey = "upstream_path"
+	ContextKeyUpstreamHost       ContextKey = "upstream_host"
+	ContextKeyUpstreamError      ContextKey = "upstream_error"
+
 	// ContextKeyFileSourcesToCleanup stores file sources that need cleanup when request ends
 	ContextKeyFileSourcesToCleanup ContextKey = "file_sources_to_cleanup"
 

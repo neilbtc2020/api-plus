@@ -12,7 +12,9 @@ import (
 	"time"
 
 	common2 "github.com/QuantumNous/new-api/common"
+	appconstant "github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/metrics"
 	"github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
@@ -512,14 +514,61 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 		}
 	}
 
+	start := time.Now()
 	resp, err := client.Do(req)
+	latency := time.Since(start)
+
+	upstreamPath := ""
+	upstreamHost := ""
+	if req != nil && req.URL != nil {
+		upstreamPath = req.URL.Path
+		upstreamHost = req.URL.Host
+	}
+
+	if upstreamPath != "" {
+		common2.SetContextKey(c, appconstant.ContextKeyUpstreamPath, upstreamPath)
+		if info != nil {
+			info.UpstreamPath = upstreamPath
+		}
+	}
+	if upstreamHost != "" {
+		common2.SetContextKey(c, appconstant.ContextKeyUpstreamHost, upstreamHost)
+		if info != nil {
+			info.UpstreamHost = upstreamHost
+		}
+	}
+
+	latencyMs := int(latency.Milliseconds())
+	common2.SetContextKey(c, appconstant.ContextKeyUpstreamLatencyMs, latencyMs)
+	if info != nil {
+		info.UpstreamLatencyMs = latency.Milliseconds()
+	}
+
+	channelId := 0
+	channelType := 0
+	if info != nil {
+		channelId = info.ChannelId
+		channelType = info.ChannelType
+	}
+
 	if err != nil {
+		maskedErr := common2.MaskSensitiveInfo(err.Error())
+		common2.SetContextKey(c, appconstant.ContextKeyUpstreamError, maskedErr)
+		if info != nil {
+			info.UpstreamError = maskedErr
+		}
+		metrics.ObserveUpstreamRequest(channelId, channelType, 0, latency)
 		logger.LogError(c, "do request failed: "+err.Error())
 		return nil, types.NewError(err, types.ErrorCodeDoRequestFailed, types.ErrOptionWithHideErrMsg("upstream error: do request failed"))
 	}
 	if resp == nil {
 		return nil, errors.New("resp is nil")
 	}
+	common2.SetContextKey(c, appconstant.ContextKeyUpstreamStatusCode, resp.StatusCode)
+	if info != nil {
+		info.UpstreamStatusCode = resp.StatusCode
+	}
+	metrics.ObserveUpstreamRequest(channelId, channelType, resp.StatusCode, latency)
 
 	_ = req.Body.Close()
 	_ = c.Request.Body.Close()

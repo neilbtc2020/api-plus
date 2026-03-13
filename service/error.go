@@ -90,6 +90,7 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 	if err != nil {
 		return
 	}
+	newApiErr.SetUpstreamErrorBody(responseBody)
 	CloseResponseBodyGracefully(resp)
 	var errResponse dto.GeneralErrorResponse
 	buildErrWithBody := func(message string) error {

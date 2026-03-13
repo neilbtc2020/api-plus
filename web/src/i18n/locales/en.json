@@ -3183,6 +3183,17 @@
     "默认折叠侧边栏": "Default collapse sidebar",
     "默认测试模型": "Default Test Model",
     "默认用户消息": "Default User Message",
-    "默认补全倍率": "Default completion ratio"
+    "默认补全倍率": "Default completion ratio",
+    "错误类型": "Error type",
+    "错误码": "Error code",
+    "状态码": "Status code",
+    "上游状态码": "Upstream status code",
+    "上游耗时": "Upstream latency",
+    "上游路径": "Upstream path",
+    "上游域名": "Upstream host",
+    "上游错误": "Upstream error",
+    "上游错误体": "Upstream error body",
+    "已截断": "truncated"
+
   }
 }

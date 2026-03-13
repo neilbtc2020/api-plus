@@ -534,6 +534,30 @@ export const useLogsData = () => {
             value: other.reasoning_effort,
           });
         }
+        if (other?.upstream_status_code) {
+          expandDataLocal.push({
+            key: t('上游状态码'),
+            value: other.upstream_status_code,
+          });
+        }
+        if (other?.upstream_latency_ms) {
+          expandDataLocal.push({
+            key: t('上游耗时'),
+            value: `${other.upstream_latency_ms} ms`,
+          });
+        }
+        if (other?.upstream_path) {
+          expandDataLocal.push({
+            key: t('上游路径'),
+            value: other.upstream_path,
+          });
+        }
+        if (other?.upstream_host) {
+          expandDataLocal.push({
+            key: t('上游域名'),
+            value: other.upstream_host,
+          });
+        }
       }
       if (logs[i].type === 6) {
         if (other?.task_id) {
@@ -548,6 +572,69 @@ export const useLogsData = () => {
             value: (
               <div style={{ maxWidth: 600, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.6 }}>
                 {other.reason}
+              </div>
+            ),
+          });
+        }
+      }
+      if (logs[i].type === 5) {
+        if (other?.error_type) {
+          expandDataLocal.push({
+            key: t('错误类型'),
+            value: other.error_type,
+          });
+        }
+        if (other?.error_code) {
+          expandDataLocal.push({
+            key: t('错误码'),
+            value: other.error_code,
+          });
+        }
+        if (other?.status_code) {
+          expandDataLocal.push({
+            key: t('状态码'),
+            value: other.status_code,
+          });
+        }
+        if (other?.upstream_status_code) {
+          expandDataLocal.push({
+            key: t('上游状态码'),
+            value: other.upstream_status_code,
+          });
+        }
+        if (other?.upstream_latency_ms) {
+          expandDataLocal.push({
+            key: t('上游耗时'),
+            value: `${other.upstream_latency_ms} ms`,
+          });
+        }
+        if (other?.upstream_path) {
+          expandDataLocal.push({
+            key: t('上游路径'),
+            value: other.upstream_path,
+          });
+        }
+        if (other?.upstream_host) {
+          expandDataLocal.push({
+            key: t('上游域名'),
+            value: other.upstream_host,
+          });
+        }
+        if (other?.upstream_error) {
+          expandDataLocal.push({
+            key: t('上游错误'),
+            value: other.upstream_error,
+          });
+        }
+        if (other?.upstream_error_body) {
+          const suffix = other?.upstream_error_body_truncated
+            ? ` (${t('已截断')})`
+            : '';
+          expandDataLocal.push({
+            key: t('上游错误体'),
+            value: (
+              <div style={{ maxWidth: 600, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.6 }}>
+                {`${other.upstream_error_body}${suffix}`}
               </div>
             ),
           });

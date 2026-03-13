@@ -3152,6 +3152,17 @@
     "默认折叠侧边栏": "Réduire la barre latérale par défaut",
     "默认测试模型": "Modèle de test par défaut",
     "默认用户消息": "Bonjour",
-    "默认补全倍率": "Taux de complétion par défaut"
+    "默认补全倍率": "Taux de complétion par défaut",
+    "错误类型": "Type d'erreur",
+    "错误码": "Code d'erreur",
+    "状态码": "Code de statut",
+    "上游状态码": "Code de statut amont",
+    "上游耗时": "Latence amont",
+    "上游路径": "Chemin amont",
+    "上游域名": "Hôte amont",
+    "上游错误": "Erreur amont",
+    "上游错误体": "Corps d'erreur amont",
+    "已截断": "tronqué"
+
   }
 }

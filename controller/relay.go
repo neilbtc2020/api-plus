@@ -13,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/metrics"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relay"
@@ -194,8 +195,23 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			newAPIError = channelErr
 			break
 		}
+		if retryParam.GetRetry() > 0 {
+			metrics.IncRelayRetry(
+				common.GetContextKeyInt(c, constant.ContextKeyChannelId),
+				common.GetContextKeyInt(c, constant.ContextKeyChannelType),
+			)
+		}
 
 		addUsedChannel(c, channel.Id)
+
+		// If this channel+model was tested with a specific endpoint, override the request path
+		// so the upstream receives the path that was proven to work.
+		if testedEP := model.GetChannelEndpoint(channel.Id, relayInfo.OriginModelName); testedEP != "" {
+			if epInfo, ok := common.GetDefaultEndpointInfo(constant.EndpointType(testedEP)); ok {
+				relayInfo.RequestURLPath = epInfo.Path
+			}
+		}
+
 		bodyStorage, bodyErr := common.GetBodyStorage(c)
 		if bodyErr != nil {
 			// Ensure consistent 413 for oversized bodies even when error occurs later (e.g., retry path)
@@ -372,6 +388,27 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		other["channel_id"] = channelId
 		other["channel_name"] = c.GetString("channel_name")
 		other["channel_type"] = c.GetInt("channel_type")
+		if upstreamStatus := common.GetContextKeyInt(c, constant.ContextKeyUpstreamStatusCode); upstreamStatus != 0 {
+			other["upstream_status_code"] = upstreamStatus
+		}
+		if upstreamLatency := common.GetContextKeyInt(c, constant.ContextKeyUpstreamLatencyMs); upstreamLatency > 0 {
+			other["upstream_latency_ms"] = upstreamLatency
+		}
+		if upstreamPath := common.GetContextKeyString(c, constant.ContextKeyUpstreamPath); upstreamPath != "" {
+			other["upstream_path"] = upstreamPath
+		}
+		if upstreamHost := common.GetContextKeyString(c, constant.ContextKeyUpstreamHost); upstreamHost != "" {
+			other["upstream_host"] = upstreamHost
+		}
+		if upstreamErr := common.GetContextKeyString(c, constant.ContextKeyUpstreamError); upstreamErr != "" {
+			other["upstream_error"] = upstreamErr
+		}
+		if err.UpstreamErrorBody != "" {
+			other["upstream_error_body"] = err.UpstreamErrorBody
+			if err.UpstreamErrorBodyTruncated {
+				other["upstream_error_body_truncated"] = true
+			}
+		}
 		adminInfo := make(map[string]interface{})
 		adminInfo["use_channel"] = c.GetStringSlice("use_channel")
 		isMultiKey := common.GetContextKeyBool(c, constant.ContextKeyChannelIsMultiKey)
@@ -523,6 +560,12 @@ func RelayTask(c *gin.Context) {
 				taskErr = service.TaskErrorWrapperLocal(channelErr.Err, "get_channel_failed", http.StatusInternalServerError)
 				break
 			}
+		}
+		if retryParam.GetRetry() > 0 {
+			metrics.IncRelayRetry(
+				common.GetContextKeyInt(c, constant.ContextKeyChannelId),
+				common.GetContextKeyInt(c, constant.ContextKeyChannelType),
+			)
 		}
 
 		addUsedChannel(c, channel.Id)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/metrics"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,7 +19,7 @@ var defNext = func(c *gin.Context) {
 	c.Next()
 }
 
-func redisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark string) {
+func redisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark string, scope string) {
 	ctx := context.Background()
 	rdb := common.RDB
 	key := "rateLimit:" + mark + c.ClientIP()
@@ -53,6 +54,7 @@ func redisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark st
 		// See: https://stackoverflow.com/questions/50970900/why-is-time-since-returning-negative-durations-on-windows
 		if int64(nowTime.Sub(oldTime).Seconds()) < duration {
 			rdb.Expire(ctx, key, common.RateLimitKeyExpirationDuration)
+			metrics.IncRateLimitHit(scope, mark)
 			c.Status(http.StatusTooManyRequests)
 			c.Abort()
 			return
@@ -64,56 +66,57 @@ func redisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark st
 	}
 }
 
-func memoryRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark string) {
+func memoryRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark string, scope string) {
 	key := mark + c.ClientIP()
 	if !inMemoryRateLimiter.Request(key, maxRequestNum, duration) {
+		metrics.IncRateLimitHit(scope, mark)
 		c.Status(http.StatusTooManyRequests)
 		c.Abort()
 		return
 	}
 }
 
-func rateLimitFactory(maxRequestNum int, duration int64, mark string) func(c *gin.Context) {
+func rateLimitFactory(maxRequestNum int, duration int64, mark string, scope string) func(c *gin.Context) {
 	if common.RedisEnabled {
 		return func(c *gin.Context) {
-			redisRateLimiter(c, maxRequestNum, duration, mark)
+			redisRateLimiter(c, maxRequestNum, duration, mark, scope)
 		}
 	} else {
 		// It's safe to call multi times.
 		inMemoryRateLimiter.Init(common.RateLimitKeyExpirationDuration)
 		return func(c *gin.Context) {
-			memoryRateLimiter(c, maxRequestNum, duration, mark)
+			memoryRateLimiter(c, maxRequestNum, duration, mark, scope)
 		}
 	}
 }
 
 func GlobalWebRateLimit() func(c *gin.Context) {
 	if common.GlobalWebRateLimitEnable {
-		return rateLimitFactory(common.GlobalWebRateLimitNum, common.GlobalWebRateLimitDuration, "GW")
+		return rateLimitFactory(common.GlobalWebRateLimitNum, common.GlobalWebRateLimitDuration, "GW", "global")
 	}
 	return defNext
 }
 
 func GlobalAPIRateLimit() func(c *gin.Context) {
 	if common.GlobalApiRateLimitEnable {
-		return rateLimitFactory(common.GlobalApiRateLimitNum, common.GlobalApiRateLimitDuration, "GA")
+		return rateLimitFactory(common.GlobalApiRateLimitNum, common.GlobalApiRateLimitDuration, "GA", "global")
 	}
 	return defNext
 }
 
 func CriticalRateLimit() func(c *gin.Context) {
 	if common.CriticalRateLimitEnable {
-		return rateLimitFactory(common.CriticalRateLimitNum, common.CriticalRateLimitDuration, "CT")
+		return rateLimitFactory(common.CriticalRateLimitNum, common.CriticalRateLimitDuration, "CT", "global")
 	}
 	return defNext
 }
 
 func DownloadRateLimit() func(c *gin.Context) {
-	return rateLimitFactory(common.DownloadRateLimitNum, common.DownloadRateLimitDuration, "DW")
+	return rateLimitFactory(common.DownloadRateLimitNum, common.DownloadRateLimitDuration, "DW", "global")
 }
 
 func UploadRateLimit() func(c *gin.Context) {
-	return rateLimitFactory(common.UploadRateLimitNum, common.UploadRateLimitDuration, "UP")
+	return rateLimitFactory(common.UploadRateLimitNum, common.UploadRateLimitDuration, "UP", "global")
 }
 
 // userRateLimitFactory creates a rate limiter keyed by authenticated user ID
@@ -129,7 +132,7 @@ func userRateLimitFactory(maxRequestNum int, duration int64, mark string) func(c
 				return
 			}
 			key := fmt.Sprintf("rateLimit:%s:user:%d", mark, userId)
-			userRedisRateLimiter(c, maxRequestNum, duration, key)
+			userRedisRateLimiter(c, maxRequestNum, duration, key, mark)
 		}
 	}
 	// It's safe to call multi times.
@@ -143,6 +146,7 @@ func userRateLimitFactory(maxRequestNum int, duration int64, mark string) func(c
 		}
 		key := fmt.Sprintf("%s:user:%d", mark, userId)
 		if !inMemoryRateLimiter.Request(key, maxRequestNum, duration) {
+			metrics.IncRateLimitHit("user", mark)
 			c.Status(http.StatusTooManyRequests)
 			c.Abort()
 			return
@@ -152,7 +156,7 @@ func userRateLimitFactory(maxRequestNum int, duration int64, mark string) func(c
 
 // userRedisRateLimiter is like redisRateLimiter but accepts a pre-built key
 // (to support user-ID-based keys).
-func userRedisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, key string) {
+func userRedisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, key string, mark string) {
 	ctx := context.Background()
 	rdb := common.RDB
 	listLength, err := rdb.LLen(ctx, key).Result()
@@ -184,6 +188,7 @@ func userRedisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, key
 		}
 		if int64(nowTime.Sub(oldTime).Seconds()) < duration {
 			rdb.Expire(ctx, key, common.RateLimitKeyExpirationDuration)
+			metrics.IncRateLimitHit("user", mark)
 			c.Status(http.StatusTooManyRequests)
 			c.Abort()
 			return

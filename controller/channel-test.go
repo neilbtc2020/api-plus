@@ -37,9 +37,11 @@ import (
 )
 
 type testResult struct {
-	context     *gin.Context
-	localErr    error
-	newAPIError *types.NewAPIError
+	context      *gin.Context
+	localErr     error
+	newAPIError  *types.NewAPIError
+	endpointType string // endpoint type used in this test (for caching)
+	testModel    string // model name used in this test (for caching)
 }
 
 func normalizeChannelTestEndpoint(channel *model.Channel, modelName, endpointType string) string {
@@ -527,9 +529,11 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 	common.SysLog(fmt.Sprintf("=== Channel Test RESPONSE ===\nBody:\n%s", string(respBody)))
 	common.SysLog(fmt.Sprintf("testing channel #%d, response: \n%s", channel.Id, string(respBody)))
 	return testResult{
-		context:     c,
-		localErr:    nil,
-		newAPIError: nil,
+		context:      c,
+		localErr:     nil,
+		newAPIError:  nil,
+		endpointType: endpointType,
+		testModel:    info.OriginModelName,
 	}
 }
 
@@ -797,6 +801,10 @@ func TestChannel(c *gin.Context) {
 	milliseconds := tok.Sub(tik).Milliseconds()
 	go channel.UpdateResponseTime(milliseconds)
 	consumedTime := float64(milliseconds) / 1000.0
+	// Cache the tested endpoint type for this channel+model on success
+	if result.newAPIError == nil && result.endpointType != "" && result.testModel != "" {
+		model.SetChannelEndpoint(channel.Id, result.testModel, result.endpointType)
+	}
 	if result.newAPIError != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -874,6 +882,11 @@ func testAllChannels(notify bool) error {
 			// enable channel
 			if !isChannelEnabled && service.ShouldEnableChannel(newAPIError, channel.Status) {
 				service.EnableChannel(channel.Id, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.Name)
+			}
+
+			// Cache tested endpoint on success (refresh on each auto-test cycle)
+			if result.newAPIError == nil && result.endpointType != "" && result.testModel != "" {
+				model.SetChannelEndpoint(channel.Id, result.testModel, result.endpointType)
 			}
 
 			channel.UpdateResponseTime(milliseconds)

@@ -3705,6 +3705,17 @@
     "默认折叠侧边栏": "Mặc định thu gọn thanh bên",
     "默认测试模型": "Mô hình kiểm tra mặc định",
     "默认用户消息": "Xin chào",
-    "默认补全倍率": "Tỷ lệ hoàn thành mặc định"
+    "默认补全倍率": "Tỷ lệ hoàn thành mặc định",
+    "错误类型": "Loại lỗi",
+    "错误码": "Mã lỗi",
+    "状态码": "Mã trạng thái",
+    "上游状态码": "Mã trạng thái upstream",
+    "上游耗时": "Độ trễ upstream",
+    "上游路径": "Đường dẫn upstream",
+    "上游域名": "Máy chủ upstream",
+    "上游错误": "Lỗi upstream",
+    "上游错误体": "Nội dung lỗi upstream",
+    "已截断": "đã cắt"
+
   }
 }
