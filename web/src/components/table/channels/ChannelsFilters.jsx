@@ -26,6 +26,8 @@ const ChannelsFilters = ({
   setShowEdit,
   refresh,
   setShowColumnSelector,
+  openChannelHealthModal,
+  channelHealthLoading,
   formInitValues,
   setFormApi,
   searchChannels,
@@ -70,6 +72,16 @@ const ChannelsFilters = ({
           className='w-full md:w-auto'
         >
           {t('列设置')}
+        </Button>
+
+        <Button
+          size='small'
+          type='tertiary'
+          loading={channelHealthLoading}
+          onClick={openChannelHealthModal}
+          className='w-full md:w-auto'
+        >
+          {t('渠道健康检查')}
         </Button>
       </div>
 

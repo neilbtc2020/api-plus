@@ -36,11 +36,9 @@ const HeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
     logoLoaded,
     currentLang,
     isLoading,
-    systemName,
     logo,
     isNewYear,
     isSelfUseMode,
-    isDemoSiteMode,
     isConsoleRoute,
     theme,
     headerNavModules,
@@ -91,10 +89,6 @@ const HeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
               logo={logo}
               logoLoaded={logoLoaded}
               isLoading={isLoading}
-              systemName={systemName}
-              isSelfUseMode={isSelfUseMode}
-              isDemoSiteMode={isDemoSiteMode}
-              t={t}
             />
           </div>
 

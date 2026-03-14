@@ -92,6 +92,10 @@ export const useChannelsData = () => {
   const [isStreamTest, setIsStreamTest] = useState(false);
   const [globalPassThroughEnabled, setGlobalPassThroughEnabled] =
     useState(false);
+  const [showChannelHealthModal, setShowChannelHealthModal] = useState(false);
+  const [channelHealthLoading, setChannelHealthLoading] = useState(false);
+  const [channelHealthItems, setChannelHealthItems] = useState([]);
+  const [channelHealthSummary, setChannelHealthSummary] = useState(null);
 
   const fetchGlobalPassThroughEnabled = async () => {
     try {
@@ -753,6 +757,41 @@ export const useChannelsData = () => {
     }
   };
 
+  const fetchChannelHealthReport = async () => {
+    setChannelHealthLoading(true);
+    try {
+      const params = [];
+      if (activeTypeKey !== 'all') {
+        params.push(`type=${activeTypeKey}`);
+      }
+      if (statusFilter !== 'all') {
+        params.push(`status=${statusFilter}`);
+      }
+      const query = params.length > 0 ? `?${params.join('&')}` : '';
+      const res = await API.get(`/api/channel/health${query}`);
+      const { success, message, data } = res.data;
+      if (success) {
+        setChannelHealthItems(data?.items || []);
+        setChannelHealthSummary(data?.summary || null);
+      } else {
+        showError(message);
+      }
+    } catch (error) {
+      showError(
+        error?.response?.data?.message ||
+          error?.message ||
+          t('渠道健康检查失败'),
+      );
+    } finally {
+      setChannelHealthLoading(false);
+    }
+  };
+
+  const openChannelHealthModal = async () => {
+    setShowChannelHealthModal(true);
+    await fetchChannelHealthReport();
+  };
+
   const updateChannelBalance = async (record) => {
     if (record?.type === 57) {
       openCodexUsageModal({
@@ -1146,6 +1185,11 @@ export const useChannelsData = () => {
     statusFilter,
     compactMode,
     globalPassThroughEnabled,
+    showChannelHealthModal,
+    setShowChannelHealthModal,
+    channelHealthLoading,
+    channelHealthItems,
+    channelHealthSummary,
 
     // UI states
     showEdit,
@@ -1230,6 +1274,8 @@ export const useChannelsData = () => {
     testAllChannels,
     deleteAllDisabledChannels,
     updateAllChannelsBalance,
+    fetchChannelHealthReport,
+    openChannelHealthModal,
     updateChannelBalance,
     fixChannelsAbilities,
     checkOllamaVersion,

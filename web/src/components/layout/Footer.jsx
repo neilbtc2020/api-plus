@@ -65,7 +65,7 @@ const FooterBar = () => {
         </div>
       </footer>
     ),
-    [logo, systemName, t, currentYear],
+    [systemName, t, currentYear],
   );
 
   useEffect(() => {

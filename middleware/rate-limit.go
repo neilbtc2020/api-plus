@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -17,6 +19,42 @@ var inMemoryRateLimiter common.InMemoryRateLimiter
 
 var defNext = func(c *gin.Context) {
 	c.Next()
+}
+
+var webStaticExtWhitelist = map[string]struct{}{
+	".js":    {},
+	".css":   {},
+	".map":   {},
+	".json":  {},
+	".svg":   {},
+	".png":   {},
+	".jpg":   {},
+	".jpeg":  {},
+	".webp":  {},
+	".ico":   {},
+	".woff":  {},
+	".woff2": {},
+	".ttf":   {},
+}
+
+func shouldSkipGlobalWebRateLimit(c *gin.Context) bool {
+	if c.Request.Method == http.MethodOptions {
+		return true
+	}
+	requestPath := c.Request.URL.Path
+	if requestPath == "" {
+		return false
+	}
+	if strings.HasPrefix(requestPath, "/assets/") ||
+		strings.HasPrefix(requestPath, "/.well-known/") ||
+		strings.HasPrefix(requestPath, "/logo") ||
+		requestPath == "/favicon.ico" ||
+		requestPath == "/robots.txt" {
+		return true
+	}
+	ext := strings.ToLower(path.Ext(requestPath))
+	_, ok := webStaticExtWhitelist[ext]
+	return ok
 }
 
 func redisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark string, scope string) {
@@ -92,7 +130,14 @@ func rateLimitFactory(maxRequestNum int, duration int64, mark string, scope stri
 
 func GlobalWebRateLimit() func(c *gin.Context) {
 	if common.GlobalWebRateLimitEnable {
-		return rateLimitFactory(common.GlobalWebRateLimitNum, common.GlobalWebRateLimitDuration, "GW", "global")
+		baseLimiter := rateLimitFactory(common.GlobalWebRateLimitNum, common.GlobalWebRateLimitDuration, "GW", "global")
+		return func(c *gin.Context) {
+			if shouldSkipGlobalWebRateLimit(c) {
+				c.Next()
+				return
+			}
+			baseLimiter(c)
+		}
 	}
 	return defNext
 }

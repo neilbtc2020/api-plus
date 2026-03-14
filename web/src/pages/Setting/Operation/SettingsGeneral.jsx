@@ -179,7 +179,6 @@ export default function GeneralSettings(props) {
                   showClear
                 />
               </Col>
-              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
               {/* 单位美元额度已合入汇率组合控件（TOKENS 模式下编辑），不再单独展示 */}
               <Col xs={24} sm={12} md={8} lg={8} xl={8}>
                 <Form.Input

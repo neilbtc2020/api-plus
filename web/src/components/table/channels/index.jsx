@@ -30,6 +30,7 @@ import { useIsMobile } from '../../../hooks/common/useIsMobile';
 import BatchTagModal from './modals/BatchTagModal';
 import ModelTestModal from './modals/ModelTestModal';
 import ColumnSelectorModal from './modals/ColumnSelectorModal';
+import ChannelHealthModal from './modals/ChannelHealthModal';
 import EditChannelModal from './modals/EditChannelModal';
 import EditTagModal from './modals/EditTagModal';
 import MultiKeyManageModal from './modals/MultiKeyManageModal';
@@ -72,6 +73,15 @@ const ChannelsPage = () => {
         confirmLoading={channelsData.upstreamApplyLoading}
         onConfirm={channelsData.applyUpstreamUpdates}
         onCancel={channelsData.closeUpstreamUpdateModal}
+      />
+      <ChannelHealthModal
+        visible={channelsData.showChannelHealthModal}
+        loading={channelsData.channelHealthLoading}
+        items={channelsData.channelHealthItems}
+        summary={channelsData.channelHealthSummary}
+        onRefresh={channelsData.fetchChannelHealthReport}
+        onCancel={() => channelsData.setShowChannelHealthModal(false)}
+        t={channelsData.t}
       />
 
       {/* Main Content */}
