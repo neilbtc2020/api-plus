@@ -650,17 +650,28 @@ export const calculateModelPrice = ({
     const inputRatioPriceUSD = record.model_ratio * 2 * usedGroupRatio;
     const completionRatioPriceUSD =
       record.model_ratio * record.completion_ratio * 2 * usedGroupRatio;
+    const hasCachePrice = typeof record.cache_ratio === 'number';
+    const hasCacheCreationPrice =
+      typeof record.cache_creation_ratio === 'number';
+    const hasCacheCreationPrice5m =
+      typeof record.cache_creation_ratio_5m === 'number';
+    const hasCacheCreationPrice1h =
+      typeof record.cache_creation_ratio_1h === 'number';
+    const cacheRatioPriceUSD = hasCachePrice
+      ? record.model_ratio * record.cache_ratio * 2 * usedGroupRatio
+      : 0;
+    const cacheCreationRatioPriceUSD = hasCacheCreationPrice
+      ? record.model_ratio * record.cache_creation_ratio * 2 * usedGroupRatio
+      : 0;
+    const cacheCreationRatioPriceUSD5m = hasCacheCreationPrice5m
+      ? record.model_ratio * record.cache_creation_ratio_5m * 2 * usedGroupRatio
+      : 0;
+    const cacheCreationRatioPriceUSD1h = hasCacheCreationPrice1h
+      ? record.model_ratio * record.cache_creation_ratio_1h * 2 * usedGroupRatio
+      : 0;
 
     const unitDivisor = tokenUnit === 'K' ? 1000 : 1;
     const unitLabel = tokenUnit === 'K' ? 'K' : 'M';
-
-    const rawDisplayInput = displayPrice(inputRatioPriceUSD);
-    const rawDisplayCompletion = displayPrice(completionRatioPriceUSD);
-
-    const numInput =
-      parseFloat(rawDisplayInput.replace(/[^0-9.]/g, '')) / unitDivisor;
-    const numCompletion =
-      parseFloat(rawDisplayCompletion.replace(/[^0-9.]/g, '')) / unitDivisor;
 
     let symbol = '$';
     if (currency === 'CNY') {
@@ -678,9 +689,31 @@ export const calculateModelPrice = ({
         symbol = '¤';
       }
     }
+
+    const formatUnitPrice = (priceUSD) => {
+      const rawDisplayPrice = displayPrice(priceUSD);
+      const displayNumber =
+        parseFloat(rawDisplayPrice.replace(/[^0-9.]/g, '')) / unitDivisor;
+      return `${symbol}${displayNumber.toFixed(precision)}`;
+    };
+
     return {
-      inputPrice: `${symbol}${numInput.toFixed(precision)}`,
-      completionPrice: `${symbol}${numCompletion.toFixed(precision)}`,
+      inputPrice: formatUnitPrice(inputRatioPriceUSD),
+      completionPrice: formatUnitPrice(completionRatioPriceUSD),
+      cachePrice: hasCachePrice ? formatUnitPrice(cacheRatioPriceUSD) : null,
+      cacheCreationPrice: hasCacheCreationPrice
+        ? formatUnitPrice(cacheCreationRatioPriceUSD)
+        : null,
+      cacheCreation5mPrice: hasCacheCreationPrice5m
+        ? formatUnitPrice(cacheCreationRatioPriceUSD5m)
+        : null,
+      cacheCreation1hPrice: hasCacheCreationPrice1h
+        ? formatUnitPrice(cacheCreationRatioPriceUSD1h)
+        : null,
+      hasCachePrice,
+      hasCacheCreationPrice,
+      hasCacheCreationPrice5m,
+      hasCacheCreationPrice1h,
       unitLabel,
       isPerToken: true,
       usedGroup,
@@ -713,11 +746,39 @@ export const calculateModelPrice = ({
 // 格式化价格信息（用于卡片视图）
 export const formatPriceInfo = (priceData, t) => {
   if (priceData.isPerToken) {
+    const cacheWriteText =
+      priceData.hasCacheCreationPrice5m || priceData.hasCacheCreationPrice1h ? (
+        <span style={{ color: 'var(--semi-color-text-1)' }}>
+          {t('缓存写')}{' '}
+          {[
+            priceData.hasCacheCreationPrice5m
+              ? `5m ${priceData.cacheCreation5mPrice}`
+              : null,
+            priceData.hasCacheCreationPrice1h
+              ? `1h ${priceData.cacheCreation1hPrice}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(' / ')}
+          /{priceData.unitLabel}
+        </span>
+      ) : priceData.hasCacheCreationPrice ? (
+        <span style={{ color: 'var(--semi-color-text-1)' }}>
+          {t('缓存写')} {priceData.cacheCreationPrice}/{priceData.unitLabel}
+        </span>
+      ) : null;
+
     return (
       <>
         <span style={{ color: 'var(--semi-color-text-1)' }}>
           {t('输入')} {priceData.inputPrice}/{priceData.unitLabel}
         </span>
+        {priceData.hasCachePrice && (
+          <span style={{ color: 'var(--semi-color-text-1)' }}>
+            {t('缓存读')} {priceData.cachePrice}/{priceData.unitLabel}
+          </span>
+        )}
+        {cacheWriteText}
         <span style={{ color: 'var(--semi-color-text-1)' }}>
           {t('输出')} {priceData.completionPrice}/{priceData.unitLabel}
         </span>

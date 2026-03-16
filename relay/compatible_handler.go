@@ -245,6 +245,8 @@ func postConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage 
 	audioTokens := usage.PromptTokensDetails.AudioTokens
 	completionTokens := usage.CompletionTokens
 	cachedCreationTokens := usage.PromptTokensDetails.CachedCreationTokens
+	cacheCreationTokens5m := usage.ClaudeCacheCreation5mTokens
+	cacheCreationTokens1h := usage.ClaudeCacheCreation1hTokens
 
 	modelName := relayInfo.OriginModelName
 
@@ -256,6 +258,8 @@ func postConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage 
 	groupRatio := relayInfo.PriceData.GroupRatioInfo.GroupRatio
 	modelPrice := relayInfo.PriceData.ModelPrice
 	cachedCreationRatio := relayInfo.PriceData.CacheCreationRatio
+	cacheCreationRatio5m := relayInfo.PriceData.CacheCreation5mRatio
+	cacheCreationRatio1h := relayInfo.PriceData.CacheCreation1hRatio
 
 	// Convert values to decimal for precise calculation
 	dPromptTokens := decimal.NewFromInt(int64(promptTokens))
@@ -263,7 +267,8 @@ func postConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage 
 	dImageTokens := decimal.NewFromInt(int64(imageTokens))
 	dAudioTokens := decimal.NewFromInt(int64(audioTokens))
 	dCompletionTokens := decimal.NewFromInt(int64(completionTokens))
-	dCachedCreationTokens := decimal.NewFromInt(int64(cachedCreationTokens))
+	dCacheCreationTokens5m := decimal.NewFromInt(int64(cacheCreationTokens5m))
+	dCacheCreationTokens1h := decimal.NewFromInt(int64(cacheCreationTokens1h))
 	dCompletionRatio := decimal.NewFromFloat(completionRatio)
 	dCacheRatio := decimal.NewFromFloat(cacheRatio)
 	dImageRatio := decimal.NewFromFloat(imageRatio)
@@ -271,6 +276,8 @@ func postConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage 
 	dGroupRatio := decimal.NewFromFloat(groupRatio)
 	dModelPrice := decimal.NewFromFloat(modelPrice)
 	dCachedCreationRatio := decimal.NewFromFloat(cachedCreationRatio)
+	dCacheCreationRatio5m := decimal.NewFromFloat(cacheCreationRatio5m)
+	dCacheCreationRatio1h := decimal.NewFromFloat(cacheCreationRatio1h)
 	dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
 
 	ratio := dModelRatio.Mul(dGroupRatio)
@@ -351,11 +358,21 @@ func postConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage 
 			cachedTokensWithRatio = dCacheTokens.Mul(dCacheRatio)
 		}
 		var dCachedCreationTokensWithRatio decimal.Decimal
-		if !dCachedCreationTokens.IsZero() {
+		totalCacheCreationTokens := cachedCreationTokens
+		if totalCacheCreationTokens == 0 {
+			totalCacheCreationTokens = cacheCreationTokens5m + cacheCreationTokens1h
+		}
+		if totalCacheCreationTokens > 0 {
 			if !isClaudeUsageSemantic {
-				baseTokens = baseTokens.Sub(dCachedCreationTokens)
+				baseTokens = baseTokens.Sub(decimal.NewFromInt(int64(totalCacheCreationTokens)))
 			}
-			dCachedCreationTokensWithRatio = dCachedCreationTokens.Mul(dCachedCreationRatio)
+			legacyCacheCreationTokens := cachedCreationTokens - cacheCreationTokens5m - cacheCreationTokens1h
+			if legacyCacheCreationTokens < 0 {
+				legacyCacheCreationTokens = 0
+			}
+			dCachedCreationTokensWithRatio = decimal.NewFromInt(int64(legacyCacheCreationTokens)).Mul(dCachedCreationRatio).
+				Add(dCacheCreationTokens5m.Mul(dCacheCreationRatio5m)).
+				Add(dCacheCreationTokens1h.Mul(dCacheCreationRatio1h))
 		}
 
 		// 减去 image tokens
@@ -457,6 +474,14 @@ func postConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage 
 	if cachedCreationTokens != 0 {
 		other["cache_creation_tokens"] = cachedCreationTokens
 		other["cache_creation_ratio"] = cachedCreationRatio
+	}
+	if cacheCreationTokens5m != 0 {
+		other["cache_creation_tokens_5m"] = cacheCreationTokens5m
+		other["cache_creation_ratio_5m"] = cacheCreationRatio5m
+	}
+	if cacheCreationTokens1h != 0 {
+		other["cache_creation_tokens_1h"] = cacheCreationTokens1h
+		other["cache_creation_ratio_1h"] = cacheCreationRatio1h
 	}
 	if !dWebSearchQuota.IsZero() {
 		if relayInfo.ResponsesUsageInfo != nil {

@@ -330,6 +330,57 @@ function getPromptCacheSummary(other) {
   };
 }
 
+function getCacheBillingSummary(other) {
+  if (!other || typeof other !== 'object') {
+    return null;
+  }
+
+  const modelRatio = Number(other.model_ratio);
+  const groupRatio = Number(other.group_ratio);
+  if (!Number.isFinite(modelRatio) || !Number.isFinite(groupRatio)) {
+    return null;
+  }
+
+  const cacheReadTokens = toTokenNumber(other.cache_tokens);
+  const cacheReadRatio = Number(other.cache_ratio) || 0;
+
+  const cacheCreationTokens = toTokenNumber(other.cache_creation_tokens);
+  const cacheCreationTokens5m = toTokenNumber(other.cache_creation_tokens_5m);
+  const cacheCreationTokens1h = toTokenNumber(other.cache_creation_tokens_1h);
+  const cacheCreationRatio = Number(other.cache_creation_ratio) || 0;
+  const cacheCreationRatio5m =
+    Number(other.cache_creation_ratio_5m) || cacheCreationRatio;
+  const cacheCreationRatio1h =
+    Number(other.cache_creation_ratio_1h) || cacheCreationRatio;
+
+  const hasSplitCacheCreation =
+    cacheCreationTokens5m > 0 || cacheCreationTokens1h > 0;
+  const legacyCacheCreationTokens = hasSplitCacheCreation
+    ? Math.max(
+        0,
+        cacheCreationTokens - cacheCreationTokens5m - cacheCreationTokens1h,
+      )
+    : cacheCreationTokens;
+
+  const readQuota =
+    cacheReadTokens > 0 ? cacheReadTokens * cacheReadRatio * modelRatio * groupRatio : 0;
+  const writeQuota =
+    legacyCacheCreationTokens * cacheCreationRatio * modelRatio * groupRatio +
+    cacheCreationTokens5m * cacheCreationRatio5m * modelRatio * groupRatio +
+    cacheCreationTokens1h * cacheCreationRatio1h * modelRatio * groupRatio;
+
+  const totalQuota = readQuota + writeQuota;
+  if (totalQuota <= 0) {
+    return null;
+  }
+
+  return {
+    readQuota,
+    writeQuota,
+    totalQuota,
+  };
+}
+
 export const getLogsColumns = ({
   t,
   COLUMN_KEYS,
@@ -621,6 +672,46 @@ export const getLogsColumns = ({
         ) : (
           <></>
         );
+      },
+    },
+    {
+      key: COLUMN_KEYS.CACHE_READ,
+      title: t('缓存读取'),
+      dataIndex: 'other',
+      render: (text, record, index) => {
+        if (!(record.type === 0 || record.type === 2 || record.type === 5 || record.type === 6)) {
+          return <></>;
+        }
+
+        const other = getLogOther(record.other);
+        const cacheReadTokens = toTokenNumber(other?.cache_tokens);
+        if (cacheReadTokens <= 0) {
+          return <span>-</span>;
+        }
+        return <span>{formatTokenCount(cacheReadTokens)}</span>;
+      },
+    },
+    {
+      key: COLUMN_KEYS.CACHE_CREATE,
+      title: t('缓存创建'),
+      dataIndex: 'other',
+      render: (text, record, index) => {
+        if (!(record.type === 0 || record.type === 2 || record.type === 5 || record.type === 6)) {
+          return <></>;
+        }
+
+        const other = getLogOther(record.other);
+        const cacheCreationTokens = toTokenNumber(other?.cache_creation_tokens);
+        const cacheCreationTokens5m = toTokenNumber(other?.cache_creation_tokens_5m);
+        const cacheCreationTokens1h = toTokenNumber(other?.cache_creation_tokens_1h);
+        const cacheWriteTokens =
+          cacheCreationTokens5m > 0 || cacheCreationTokens1h > 0
+            ? cacheCreationTokens5m + cacheCreationTokens1h
+            : cacheCreationTokens;
+        if (cacheWriteTokens <= 0) {
+          return <span>-</span>;
+        }
+        return <span>{formatTokenCount(cacheWriteTokens)}</span>;
       },
     },
     {

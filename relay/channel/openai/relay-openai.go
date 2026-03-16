@@ -598,6 +598,8 @@ func applyUsagePostProcessing(info *relaycommon.RelayInfo, usage *dto.Usage, res
 		return
 	}
 
+	backfillUsageCacheDetails(usage, responseBody)
+
 	switch info.ChannelType {
 	case constant.ChannelTypeDeepSeek:
 		if usage.PromptTokensDetails.CachedTokens == 0 && usage.PromptCacheHitTokens != 0 {
@@ -630,33 +632,153 @@ func applyUsagePostProcessing(info *relaycommon.RelayInfo, usage *dto.Usage, res
 	}
 }
 
-func extractCachedTokensFromBody(body []byte) (int, bool) {
+func backfillUsageCacheDetails(usage *dto.Usage, body []byte) {
+	if usage == nil {
+		return
+	}
+
+	if usage.PromptTokensDetails.CachedTokens == 0 {
+		switch {
+		case usage.InputTokensDetails != nil && usage.InputTokensDetails.CachedTokens > 0:
+			usage.PromptTokensDetails.CachedTokens = usage.InputTokensDetails.CachedTokens
+		case usage.PromptCacheHitTokens > 0:
+			usage.PromptTokensDetails.CachedTokens = usage.PromptCacheHitTokens
+		}
+	}
+
 	if len(body) == 0 {
-		return 0, false
+		if usage.PromptTokensDetails.CachedCreationTokens == 0 &&
+			(usage.ClaudeCacheCreation5mTokens > 0 || usage.ClaudeCacheCreation1hTokens > 0) {
+			usage.PromptTokensDetails.CachedCreationTokens = usage.ClaudeCacheCreation5mTokens + usage.ClaudeCacheCreation1hTokens
+		}
+		return
+	}
+
+	cacheDetails, ok := extractUsageCacheDetailsFromBody(body)
+	if !ok {
+		if usage.PromptTokensDetails.CachedCreationTokens == 0 &&
+			(usage.ClaudeCacheCreation5mTokens > 0 || usage.ClaudeCacheCreation1hTokens > 0) {
+			usage.PromptTokensDetails.CachedCreationTokens = usage.ClaudeCacheCreation5mTokens + usage.ClaudeCacheCreation1hTokens
+		}
+		return
+	}
+
+	if usage.PromptTokensDetails.CachedTokens == 0 && cacheDetails.CachedTokens > 0 {
+		usage.PromptTokensDetails.CachedTokens = cacheDetails.CachedTokens
+	}
+	if usage.ClaudeCacheCreation5mTokens == 0 && cacheDetails.CacheCreation5mTokens > 0 {
+		usage.ClaudeCacheCreation5mTokens = cacheDetails.CacheCreation5mTokens
+	}
+	if usage.ClaudeCacheCreation1hTokens == 0 && cacheDetails.CacheCreation1hTokens > 0 {
+		usage.ClaudeCacheCreation1hTokens = cacheDetails.CacheCreation1hTokens
+	}
+	if usage.PromptTokensDetails.CachedCreationTokens == 0 {
+		switch {
+		case cacheDetails.CacheCreationTokens > 0:
+			usage.PromptTokensDetails.CachedCreationTokens = cacheDetails.CacheCreationTokens
+		case usage.ClaudeCacheCreation5mTokens > 0 || usage.ClaudeCacheCreation1hTokens > 0:
+			usage.PromptTokensDetails.CachedCreationTokens = usage.ClaudeCacheCreation5mTokens + usage.ClaudeCacheCreation1hTokens
+		}
+	}
+}
+
+type usageCacheDetails struct {
+	CachedTokens          int
+	CacheCreationTokens   int
+	CacheCreation5mTokens int
+	CacheCreation1hTokens int
+}
+
+func extractUsageCacheDetailsFromBody(body []byte) (usageCacheDetails, bool) {
+	if len(body) == 0 {
+		return usageCacheDetails{}, false
 	}
 
 	var payload struct {
 		Usage struct {
 			PromptTokensDetails struct {
-				CachedTokens *int `json:"cached_tokens"`
+				CachedTokens         *int `json:"cached_tokens"`
+				CachedCreationTokens *int `json:"cached_creation_tokens"`
 			} `json:"prompt_tokens_details"`
-			CachedTokens         *int `json:"cached_tokens"`
-			PromptCacheHitTokens *int `json:"prompt_cache_hit_tokens"`
+			InputTokensDetails struct {
+				CachedTokens *int `json:"cached_tokens"`
+			} `json:"input_tokens_details"`
+			CachedTokens             *int `json:"cached_tokens"`
+			PromptCacheHitTokens     *int `json:"prompt_cache_hit_tokens"`
+			CacheCreationInputTokens *int `json:"cache_creation_input_tokens"`
+			CacheCreation            struct {
+				Ephemeral5mInputTokens *int `json:"ephemeral_5m_input_tokens"`
+				Ephemeral1hInputTokens *int `json:"ephemeral_1h_input_tokens"`
+			} `json:"cache_creation"`
 		} `json:"usage"`
+		Choices []struct {
+			Usage struct {
+				CachedTokens             *int `json:"cached_tokens"`
+				CacheCreationInputTokens *int `json:"cache_creation_input_tokens"`
+				CacheCreation            struct {
+					Ephemeral5mInputTokens *int `json:"ephemeral_5m_input_tokens"`
+					Ephemeral1hInputTokens *int `json:"ephemeral_1h_input_tokens"`
+				} `json:"cache_creation"`
+			} `json:"usage"`
+		} `json:"choices"`
 	}
 
 	if err := common.Unmarshal(body, &payload); err != nil {
-		return 0, false
+		return usageCacheDetails{}, false
 	}
 
+	details := usageCacheDetails{}
 	if payload.Usage.PromptTokensDetails.CachedTokens != nil {
-		return *payload.Usage.PromptTokensDetails.CachedTokens, true
+		details.CachedTokens = *payload.Usage.PromptTokensDetails.CachedTokens
+	} else if payload.Usage.InputTokensDetails.CachedTokens != nil {
+		details.CachedTokens = *payload.Usage.InputTokensDetails.CachedTokens
+	} else if payload.Usage.CachedTokens != nil {
+		details.CachedTokens = *payload.Usage.CachedTokens
+	} else if payload.Usage.PromptCacheHitTokens != nil {
+		details.CachedTokens = *payload.Usage.PromptCacheHitTokens
 	}
-	if payload.Usage.CachedTokens != nil {
-		return *payload.Usage.CachedTokens, true
+
+	if payload.Usage.PromptTokensDetails.CachedCreationTokens != nil {
+		details.CacheCreationTokens = *payload.Usage.PromptTokensDetails.CachedCreationTokens
+	} else if payload.Usage.CacheCreationInputTokens != nil {
+		details.CacheCreationTokens = *payload.Usage.CacheCreationInputTokens
 	}
-	if payload.Usage.PromptCacheHitTokens != nil {
-		return *payload.Usage.PromptCacheHitTokens, true
+	if payload.Usage.CacheCreation.Ephemeral5mInputTokens != nil {
+		details.CacheCreation5mTokens = *payload.Usage.CacheCreation.Ephemeral5mInputTokens
+	}
+	if payload.Usage.CacheCreation.Ephemeral1hInputTokens != nil {
+		details.CacheCreation1hTokens = *payload.Usage.CacheCreation.Ephemeral1hInputTokens
+	}
+
+	for _, choice := range payload.Choices {
+		if details.CachedTokens == 0 && choice.Usage.CachedTokens != nil && *choice.Usage.CachedTokens > 0 {
+			details.CachedTokens = *choice.Usage.CachedTokens
+		}
+		if details.CacheCreationTokens == 0 && choice.Usage.CacheCreationInputTokens != nil && *choice.Usage.CacheCreationInputTokens > 0 {
+			details.CacheCreationTokens = *choice.Usage.CacheCreationInputTokens
+		}
+		if details.CacheCreation5mTokens == 0 && choice.Usage.CacheCreation.Ephemeral5mInputTokens != nil && *choice.Usage.CacheCreation.Ephemeral5mInputTokens > 0 {
+			details.CacheCreation5mTokens = *choice.Usage.CacheCreation.Ephemeral5mInputTokens
+		}
+		if details.CacheCreation1hTokens == 0 && choice.Usage.CacheCreation.Ephemeral1hInputTokens != nil && *choice.Usage.CacheCreation.Ephemeral1hInputTokens > 0 {
+			details.CacheCreation1hTokens = *choice.Usage.CacheCreation.Ephemeral1hInputTokens
+		}
+	}
+
+	if details.CacheCreationTokens == 0 && (details.CacheCreation5mTokens > 0 || details.CacheCreation1hTokens > 0) {
+		details.CacheCreationTokens = details.CacheCreation5mTokens + details.CacheCreation1hTokens
+	}
+
+	return details, details.CachedTokens > 0 ||
+		details.CacheCreationTokens > 0 ||
+		details.CacheCreation5mTokens > 0 ||
+		details.CacheCreation1hTokens > 0
+}
+
+func extractCachedTokensFromBody(body []byte) (int, bool) {
+	cacheDetails, ok := extractUsageCacheDetailsFromBody(body)
+	if ok && cacheDetails.CachedTokens > 0 {
+		return cacheDetails.CachedTokens, true
 	}
 	return 0, false
 }

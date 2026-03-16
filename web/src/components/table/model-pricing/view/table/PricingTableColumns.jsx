@@ -218,6 +218,31 @@ export const getPricingTableColumns = ({
             {record.quota_type === 0 ? completionRatio : t('无')}
           </div>
           <div className='text-gray-700'>
+            {t('缓存倍率')}：
+            {record.quota_type === 0 && priceData?.hasCachePrice
+              ? record.cache_ratio
+              : t('无')}
+          </div>
+          <div className='text-gray-700'>
+            {t('缓存创建倍率')}：
+            {record.quota_type === 0 &&
+            (priceData?.hasCacheCreationPrice5m ||
+              priceData?.hasCacheCreationPrice1h)
+              ? [
+                  priceData?.hasCacheCreationPrice5m
+                    ? `5m ${record.cache_creation_ratio_5m}`
+                    : null,
+                  priceData?.hasCacheCreationPrice1h
+                    ? `1h ${record.cache_creation_ratio_1h}`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(' / ')
+              : record.quota_type === 0 && priceData?.hasCacheCreationPrice
+                ? record.cache_creation_ratio
+                : t('无')}
+          </div>
+          <div className='text-gray-700'>
             {t('分组倍率')}：{priceData?.usedGroupRatio ?? '-'}
           </div>
         </div>
@@ -238,6 +263,33 @@ export const getPricingTableColumns = ({
             <div className='text-gray-700'>
               {t('输入')} {priceData.inputPrice} / 1{priceData.unitLabel} tokens
             </div>
+            {priceData.hasCachePrice && (
+              <div className='text-gray-700'>
+                {t('缓存读')} {priceData.cachePrice} / 1{priceData.unitLabel}{' '}
+                tokens
+              </div>
+            )}
+            {(priceData.hasCacheCreationPrice ||
+              priceData.hasCacheCreationPrice5m ||
+              priceData.hasCacheCreationPrice1h) && (
+              <div className='text-gray-700'>
+                {t('缓存写')}{' '}
+                {priceData.hasCacheCreationPrice5m ||
+                priceData.hasCacheCreationPrice1h
+                  ? [
+                      priceData.hasCacheCreationPrice5m
+                        ? `5m ${priceData.cacheCreation5mPrice}`
+                        : null,
+                      priceData.hasCacheCreationPrice1h
+                        ? `1h ${priceData.cacheCreation1hPrice}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' / ')
+                  : priceData.cacheCreationPrice}{' '}
+                / 1{priceData.unitLabel} tokens
+              </div>
+            )}
             <div className='text-gray-700'>
               {t('输出')} {priceData.completionPrice} / 1{priceData.unitLabel}{' '}
               tokens

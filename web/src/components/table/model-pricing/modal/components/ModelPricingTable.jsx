@@ -75,6 +75,28 @@ const ModelPricingTable = ({
               ? t('按次计费')
               : '-',
         inputPrice: modelData?.quota_type === 0 ? priceData.inputPrice : '-',
+        cachePrice:
+          modelData?.quota_type === 0 && priceData.hasCachePrice
+            ? priceData.cachePrice
+            : '-',
+        cacheWritePrice:
+          modelData?.quota_type === 0
+            ? priceData.hasCacheCreationPrice5m ||
+              priceData.hasCacheCreationPrice1h
+              ? [
+                  priceData.hasCacheCreationPrice5m
+                    ? `5m ${priceData.cacheCreation5mPrice}`
+                    : null,
+                  priceData.hasCacheCreationPrice1h
+                    ? `1h ${priceData.cacheCreation1hPrice}`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(' / ')
+              : priceData.hasCacheCreationPrice
+                ? priceData.cacheCreationPrice
+                : '-'
+            : '-',
         outputPrice:
           modelData?.quota_type === 0
             ? priceData.completionPrice || priceData.outputPrice
@@ -133,6 +155,30 @@ const ModelPricingTable = ({
         {
           title: t('提示'),
           dataIndex: 'inputPrice',
+          render: (text) => (
+            <>
+              <div className='font-semibold text-orange-600'>{text}</div>
+              <div className='text-xs text-gray-500'>
+                / {tokenUnit === 'K' ? '1K' : '1M'} tokens
+              </div>
+            </>
+          ),
+        },
+        {
+          title: t('缓存读'),
+          dataIndex: 'cachePrice',
+          render: (text) => (
+            <>
+              <div className='font-semibold text-orange-600'>{text}</div>
+              <div className='text-xs text-gray-500'>
+                / {tokenUnit === 'K' ? '1K' : '1M'} tokens
+              </div>
+            </>
+          ),
+        },
+        {
+          title: t('缓存写'),
+          dataIndex: 'cacheWritePrice',
           render: (text) => (
             <>
               <div className='font-semibold text-orange-600'>{text}</div>

@@ -25,6 +25,10 @@ type Pricing struct {
 	ModelPrice             float64                 `json:"model_price"`
 	OwnerBy                string                  `json:"owner_by"`
 	CompletionRatio        float64                 `json:"completion_ratio"`
+	CacheRatio             *float64                `json:"cache_ratio,omitempty"`
+	CacheCreationRatio     *float64                `json:"cache_creation_ratio,omitempty"`
+	CacheCreation5mRatio   *float64                `json:"cache_creation_ratio_5m,omitempty"`
+	CacheCreation1hRatio   *float64                `json:"cache_creation_ratio_1h,omitempty"`
 	EnableGroup            []string                `json:"enable_groups"`
 	SupportedEndpointTypes []constant.EndpointType `json:"supported_endpoint_types"`
 	PricingVersion         string                  `json:"pricing_version,omitempty"`
@@ -91,6 +95,8 @@ func GetModelSupportEndpointTypes(model string) []constant.EndpointType {
 }
 
 func updatePricing() {
+	const claudeCacheCreation1hMultiplier = 6 / 3.75
+
 	//modelRatios := common.GetModelRatios()
 	enableAbilities, err := GetAllEnableAbilityWithChannels()
 	if err != nil {
@@ -295,6 +301,16 @@ func updatePricing() {
 			modelRatio, _, _ := ratio_setting.GetModelRatio(model)
 			pricing.ModelRatio = modelRatio
 			pricing.CompletionRatio = ratio_setting.GetCompletionRatio(model)
+			if cacheRatio, ok := ratio_setting.GetCacheRatio(model); ok {
+				pricing.CacheRatio = &cacheRatio
+			}
+			if cacheCreationRatio, ok := ratio_setting.GetCreateCacheRatio(model); ok {
+				cacheCreationRatio5m := cacheCreationRatio
+				cacheCreationRatio1h := cacheCreationRatio * claudeCacheCreation1hMultiplier
+				pricing.CacheCreationRatio = &cacheCreationRatio
+				pricing.CacheCreation5mRatio = &cacheCreationRatio5m
+				pricing.CacheCreation1hRatio = &cacheCreationRatio1h
+			}
 			pricing.QuotaType = 0
 		}
 		pricingMap = append(pricingMap, pricing)
@@ -302,7 +318,7 @@ func updatePricing() {
 
 	// 防止大更新后数据不通用
 	if len(pricingMap) > 0 {
-		pricingMap[0].PricingVersion = "82c4a357505fff6fee8462c3f7ec8a645bb95532669cb73b2cabee6a416ec24f"
+		pricingMap[0].PricingVersion = "ff32d447f9c2e8f44e3d4d573c5b4c2cbb3c2ed112a15a34bc2e8b49f59ca6ca"
 	}
 
 	// 刷新缓存映射，供高并发快速查询
