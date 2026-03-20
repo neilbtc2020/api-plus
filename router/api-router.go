@@ -307,6 +307,7 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			modelAvailabilityRoute.GET("", controller.GetModelAvailability)
 			modelAvailabilityRoute.POST("/refresh", controller.RefreshModelAvailability)
+			modelAvailabilityRoute.POST("/probe", controller.ProbeModelAvailability)
 		}
 
 		prefillGroupRoute := apiRouter.Group("/prefill_group")
