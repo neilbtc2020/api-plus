@@ -40,6 +40,7 @@ import {
 } from '@douyinfe/semi-icons';
 import { Link } from 'react-router-dom';
 import NoticeModal from '../../components/layout/NoticeModal';
+import ModelAvailabilityEntryCard from '../../components/home/ModelAvailabilityEntryCard';
 
 const Home = () => {
   const { t, i18n } = useTranslation();
@@ -395,7 +396,7 @@ openclaw`,
               </div>
 
               <div className='mt-14'>
-                <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+                <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4'>
                   <div className='rounded-2xl border border-semi-color-border p-5 bg-semi-color-bg-0'>
                     <div className='text-lg font-semibold'>统一接入</div>
                     <div className='text-semi-color-text-1 mt-2 text-sm'>
@@ -414,6 +415,7 @@ openclaw`,
                       注册即可生成密钥，替换 Base URL 后可快速开始请求。
                     </div>
                   </div>
+                  <ModelAvailabilityEntryCard />
                 </div>
               </div>
 
