@@ -152,6 +152,7 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 		}
 	}
 	cache.WriteContext(c)
+	c.Set("channel_test_allow_auto_disabled_keys", true)
 
 	//c.Request.Header.Set("Authorization", "Bearer "+channel.Key)
 	c.Request.Header.Set("Content-Type", "application/json")

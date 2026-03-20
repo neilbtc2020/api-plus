@@ -43,6 +43,7 @@ import Pricing from './pages/Pricing';
 import Task from './pages/Task';
 import ModelPage from './pages/Model';
 import ModelDeploymentPage from './pages/ModelDeployment';
+import ModelAvailabilityPage from './pages/ModelAvailability';
 import Playground from './pages/Playground';
 import Subscription from './pages/Subscription';
 import OAuth2Callback from './components/auth/OAuth2Callback';
@@ -312,6 +313,14 @@ function App() {
               <Suspense fallback={<Loading></Loading>} key={location.pathname}>
                 <Task />
               </Suspense>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path='/model-availability'
+          element={
+            <PrivateRoute>
+              <ModelAvailabilityPage />
             </PrivateRoute>
           }
         />

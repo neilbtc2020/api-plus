@@ -364,7 +364,18 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 
 	key, index, newAPIError := channel.GetNextEnabledKey()
 	if newAPIError != nil {
-		return newAPIError
+		if channel.ChannelInfo.IsMultiKey &&
+			channel.Status == common.ChannelStatusAutoDisabled &&
+			c.GetBool("channel_test_allow_auto_disabled_keys") {
+			keys := channel.GetKeys()
+			if len(keys) == 0 {
+				return newAPIError
+			}
+			key = keys[0]
+			index = 0
+		} else {
+			return newAPIError
+		}
 	}
 	if channel.ChannelInfo.IsMultiKey {
 		common.SetContextKey(c, constant.ContextKeyChannelIsMultiKey, true)
