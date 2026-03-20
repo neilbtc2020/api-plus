@@ -35,6 +35,7 @@ import {
   Col,
   Divider,
   Tooltip,
+  Select,
 } from '@douyinfe/semi-ui';
 import { IconPlus, IconDelete, IconAlertTriangle } from '@douyinfe/semi-icons';
 
@@ -61,6 +62,7 @@ const JSONEditor = ({
   rules = [],
   formApi = null,
   renderStringValueSuffix,
+  modelMappingEndpointTypes = [],
   ...props
 }) => {
   const { t } = useTranslation();
@@ -186,7 +188,29 @@ const JSONEditor = ({
   const handleVisualChange = useCallback(
     (newPairs) => {
       setKeyValuePairs(newPairs);
-      const jsonObject = keyValueArrayToObject(newPairs);
+      let jsonObject = keyValueArrayToObject(newPairs);
+      if (editorType === 'modelMapping') {
+        jsonObject = Object.fromEntries(
+          Object.entries(jsonObject).map(([key, value]) => {
+            if (!value || typeof value !== 'object' || Array.isArray(value)) {
+              return [key, value];
+            }
+            const targetModel = String(value.target_model || '');
+            const endpointType = String(value.endpoint_type || '').trim();
+            return [
+              key,
+              endpointType
+                ? {
+                    target_model: targetModel,
+                    endpoint_type: endpointType,
+                  }
+                : {
+                    target_model: targetModel,
+                  },
+            ];
+          }),
+        );
+      }
       const jsonString =
         Object.keys(jsonObject).length === 0
           ? ''
@@ -201,7 +225,7 @@ const JSONEditor = ({
 
       onChange?.(jsonString);
     },
-    [onChange, formApi, field, keyValueArrayToObject],
+    [onChange, formApi, field, keyValueArrayToObject, editorType],
   );
 
   // 处理手动编辑的数据变化
@@ -276,10 +300,16 @@ const JSONEditor = ({
     newPairs.push({
       id: generateUniqueId(),
       key: newKey,
-      value: '',
+      value:
+        editorType === 'modelMapping'
+          ? {
+              target_model: '',
+              endpoint_type: '',
+            }
+          : '',
     });
     handleVisualChange(newPairs);
-  }, [keyValuePairs, handleVisualChange]);
+  }, [keyValuePairs, handleVisualChange, editorType]);
 
   // 删除键值对
   const removeKeyValue = useCallback(
@@ -502,6 +532,144 @@ const JSONEditor = ({
     );
   };
 
+  const renderModelMappingEditor = () => {
+    return (
+      <div className='space-y-2'>
+        {duplicateKeys.size > 0 && (
+          <Banner
+            type='warning'
+            icon={<IconAlertTriangle />}
+            description={
+              <div>
+                <Text strong>{t('存在重复的键名：')}</Text>
+                <Text>{Array.from(duplicateKeys).join(', ')}</Text>
+                <br />
+                <Text type='tertiary' size='small'>
+                  {t('注意：JSON中重复的键只会保留最后一个同名键的值')}
+                </Text>
+              </div>
+            }
+            className='mb-3'
+          />
+        )}
+
+        {keyValuePairs.length === 0 && (
+          <div className='text-center py-6 px-4'>
+            <Text type='tertiary' className='text-gray-500 text-sm'>
+              {t('暂无重定向规则，点击下方按钮添加')}
+            </Text>
+          </div>
+        )}
+
+        {keyValuePairs.map((pair, index) => {
+          const isDuplicate = duplicateKeys.has(pair.key);
+          const pairValue =
+            pair.value &&
+            typeof pair.value === 'object' &&
+            !Array.isArray(pair.value)
+              ? pair.value
+              : { target_model: pair.value ?? '', endpoint_type: '' };
+          const isLastDuplicate =
+            isDuplicate &&
+            keyValuePairs.slice(index + 1).every((p) => p.key !== pair.key);
+
+          return (
+            <div
+              key={pair.id}
+              className='border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-3'
+            >
+              <Row gutter={8} align='middle'>
+                <Col span={22}>
+                  <div className='relative'>
+                    <Input
+                      placeholder={t('请求模型名称')}
+                      value={pair.key}
+                      onChange={(newKey) => updateKey(pair.id, newKey)}
+                      status={isDuplicate ? 'warning' : undefined}
+                    />
+                    {isDuplicate && (
+                      <Tooltip
+                        content={
+                          isLastDuplicate
+                            ? t('这是重复键中的最后一个，其值将被使用')
+                            : t('重复的键名，此值将被后面的同名键覆盖')
+                        }
+                      >
+                        <IconAlertTriangle
+                          className='absolute right-2 top-1/2 transform -translate-y-1/2'
+                          style={{
+                            color: isLastDuplicate ? '#ff7d00' : '#faad14',
+                            fontSize: '14px',
+                          }}
+                        />
+                      </Tooltip>
+                    )}
+                  </div>
+                </Col>
+                <Col span={2}>
+                  <Button
+                    icon={<IconDelete />}
+                    type='danger'
+                    theme='borderless'
+                    onClick={() => removeKeyValue(pair.id)}
+                    style={{ width: '100%' }}
+                  />
+                </Col>
+              </Row>
+
+              <Row gutter={8}>
+                <Col span={12}>
+                  <Input
+                    placeholder={t('目标模型名称')}
+                    value={pairValue.target_model || ''}
+                    onChange={(newValue) =>
+                      updateValue(pair.id, {
+                        ...pairValue,
+                        target_model: newValue,
+                      })
+                    }
+                  />
+                </Col>
+                <Col span={12}>
+                  <Select
+                    placeholder={t('默认 endpoint（可选）')}
+                    value={pairValue.endpoint_type || undefined}
+                    onChange={(newValue) =>
+                      updateValue(pair.id, {
+                        ...pairValue,
+                        endpoint_type: newValue || '',
+                      })
+                    }
+                    showClear
+                    optionList={
+                      Array.isArray(modelMappingEndpointTypes)
+                        ? modelMappingEndpointTypes.map((item) => ({
+                            label: item,
+                            value: item,
+                          }))
+                        : []
+                    }
+                  />
+                </Col>
+              </Row>
+            </div>
+          );
+        })}
+
+        <div className='mt-2 flex justify-center'>
+          <Button
+            icon={<IconPlus />}
+            type='primary'
+            theme='outline'
+            onClick={addKeyValue}
+          >
+            {t('添加重定向规则')}
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   // 渲染区域编辑器（特殊格式）- 也需要改造以支持重复键
   const renderRegionEditor = () => {
     const defaultPair = keyValuePairs.find((pair) => pair.key === 'default');
@@ -617,6 +785,8 @@ const JSONEditor = ({
     switch (editorType) {
       case 'region':
         return renderRegionEditor();
+      case 'modelMapping':
+        return renderModelMappingEditor();
       case 'object':
       case 'keyValue':
       default:

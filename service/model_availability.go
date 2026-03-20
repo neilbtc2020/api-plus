@@ -39,6 +39,19 @@ type VisibleGroup struct {
 	Selected bool   `json:"selected"`
 }
 
+type GroupAvailabilitySnapshot struct {
+	Groups        []VisibleGroup          `json:"groups"`
+	SelectedGroup string                  `json:"selected_group"`
+	RefreshedAt   int64                   `json:"refreshed_at"`
+	Items         []ModelAvailabilityItem `json:"items"`
+}
+
+type groupAvailabilityCacheValue struct {
+	Group       string                  `json:"group"`
+	RefreshedAt int64                   `json:"refreshed_at"`
+	Items       []ModelAvailabilityItem `json:"items"`
+}
+
 func buildRecentResultsWindow(entries []availabilityLogEntry, windowSize int) []RecentResult {
 	if windowSize <= 0 {
 		return []RecentResult{}
@@ -103,4 +116,24 @@ func resolveSelectedGroup(groups []VisibleGroup, requestedGroup string) string {
 	}
 
 	return groups[0].Name
+}
+
+func buildModelAvailabilityItem(modelName string, entries []availabilityLogEntry, probe *ProbeStatus) ModelAvailabilityItem {
+	item := ModelAvailabilityItem{
+		ModelName:       modelName,
+		ConfigAvailable: true,
+		RecentResults:   buildRecentResultsWindow(entries, 20),
+		HasRealLogs:     len(entries) > 0,
+		Probe:           probe,
+	}
+
+	for _, entry := range entries {
+		if entry.Success {
+			item.SuccessCount++
+			continue
+		}
+		item.FailCount++
+	}
+
+	return item
 }

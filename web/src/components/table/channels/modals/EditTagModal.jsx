@@ -49,12 +49,15 @@ import {
 } from '@douyinfe/semi-icons';
 import { getChannelModels } from '../../../../helpers';
 import { useTranslation } from 'react-i18next';
+import JSONEditor from '../../../common/ui/JSONEditor';
+import {
+  MODEL_MAPPING_ENDPOINT_TYPES,
+  MODEL_MAPPING_EXAMPLE,
+  normalizeModelMappingConfig,
+  validateModelMappingConfig,
+} from './modelMappingUtils';
 
 const { Text, Title } = Typography;
-
-const MODEL_MAPPING_EXAMPLE = {
-  'gpt-3.5-turbo': 'gpt-3.5-turbo-0125',
-};
 
 const EditTagModal = (props) => {
   const { t } = useTranslation();
@@ -205,7 +208,17 @@ const EditTagModal = (props) => {
         setLoading(false);
         return;
       }
-      data.model_mapping = formVals.model_mapping;
+      const parsedModelMapping = normalizeModelMappingConfig(
+        JSON.parse(formVals.model_mapping),
+      );
+      const modelMappingValidationError =
+        validateModelMappingConfig(parsedModelMapping);
+      if (modelMappingValidationError) {
+        showInfo(modelMappingValidationError);
+        setLoading(false);
+        return;
+      }
+      data.model_mapping = JSON.stringify(parsedModelMapping, null, 2);
     }
     if (formVals.groups && formVals.groups.length > 0) {
       data.groups = formVals.groups.join(',');
@@ -514,47 +527,64 @@ const EditTagModal = (props) => {
                     }
                   />
 
-                  <Form.TextArea
+                  <JSONEditor
                     field='model_mapping'
                     label={t('模型重定向')}
                     placeholder={t(
-                      '此项可选，用于修改请求体中的模型名称，为一个 JSON 字符串，键为请求中模型名称，值为要替换的模型名称，留空则不更改',
+                      '此项可选，用于修改请求体中的模型名称。值既可以是目标模型字符串，也可以是包含 target_model 和可选 endpoint_type 的对象；留空则不更改',
                     )}
-                    autosize
+                    template={MODEL_MAPPING_EXAMPLE}
+                    templateLabel={t('填入模板')}
+                    editorType='modelMapping'
+                    modelMappingEndpointTypes={MODEL_MAPPING_ENDPOINT_TYPES}
+                    formApi={formApiRef.current}
+                    value={inputs.model_mapping || ''}
                     onChange={(value) =>
                       handleInputChange('model_mapping', value)
                     }
                     extraText={
-                      <Space>
-                        <Text
-                          className='!text-semi-color-primary cursor-pointer'
-                          onClick={() =>
-                            handleInputChange(
-                              'model_mapping',
-                              JSON.stringify(MODEL_MAPPING_EXAMPLE, null, 2),
-                            )
-                          }
-                        >
-                          {t('填入模板')}
+                      <div className='flex flex-col gap-2'>
+                        <Text type='tertiary'>
+                          {t(
+                            '键为请求中的模型名称；值可为字符串，或 { target_model, endpoint_type }。endpoint_type 可选值：{{types}}',
+                            {
+                              types: MODEL_MAPPING_ENDPOINT_TYPES.join(', '),
+                            },
+                          )}
                         </Text>
-                        <Text
-                          className='!text-semi-color-primary cursor-pointer'
-                          onClick={() =>
-                            handleInputChange(
-                              'model_mapping',
-                              JSON.stringify({}, null, 2),
-                            )
-                          }
-                        >
-                          {t('清空重定向')}
-                        </Text>
-                        <Text
-                          className='!text-semi-color-primary cursor-pointer'
-                          onClick={() => handleInputChange('model_mapping', '')}
-                        >
-                          {t('不更改')}
-                        </Text>
-                      </Space>
+                        <Space>
+                          <Text
+                            className='!text-semi-color-primary cursor-pointer'
+                            onClick={() =>
+                              handleInputChange(
+                                'model_mapping',
+                                JSON.stringify(MODEL_MAPPING_EXAMPLE, null, 2),
+                              )
+                            }
+                          >
+                            {t('填入模板')}
+                          </Text>
+                          <Text
+                            className='!text-semi-color-primary cursor-pointer'
+                            onClick={() =>
+                              handleInputChange(
+                                'model_mapping',
+                                JSON.stringify({}, null, 2),
+                              )
+                            }
+                          >
+                            {t('清空重定向')}
+                          </Text>
+                          <Text
+                            className='!text-semi-color-primary cursor-pointer'
+                            onClick={() =>
+                              handleInputChange('model_mapping', '')
+                            }
+                          >
+                            {t('不更改')}
+                          </Text>
+                        </Space>
+                      </div>
                     }
                   />
                 </div>

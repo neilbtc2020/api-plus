@@ -260,6 +260,29 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 	// 更新请求中的模型名称
 	request.SetModelName(testModel)
 
+	switch info.RelayMode {
+	case relayconstant.RelayModeResponses:
+		switch req := request.(type) {
+		case *dto.GeneralOpenAIRequest:
+			responsesReq, convErr := service.ChatCompletionsRequestToResponsesRequest(req)
+			if convErr != nil {
+				return testResult{
+					context:     c,
+					localErr:    convErr,
+					newAPIError: types.NewError(convErr, types.ErrorCodeConvertRequestFailed),
+				}
+			}
+			request = responsesReq
+		case *dto.OpenAIResponsesCompactionRequest:
+			request = &dto.OpenAIResponsesRequest{
+				Model:              req.Model,
+				Input:              req.Input,
+				Instructions:       req.Instructions,
+				PreviousResponseID: req.PreviousResponseID,
+			}
+		}
+	}
+
 	apiType, _ := common.ChannelType2APIType(channel.Type)
 	if info.RelayMode == relayconstant.RelayModeResponsesCompact &&
 		apiType != constant.APITypeOpenAI &&
@@ -423,10 +446,11 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 	// Debug: print curl command
 	{
 		fullURL := info.ChannelBaseUrl
-		if !strings.HasSuffix(fullURL, "/") && !strings.HasPrefix(requestPath, "/") {
+		effectiveRequestPath := info.RequestURLPath
+		if !strings.HasSuffix(fullURL, "/") && !strings.HasPrefix(effectiveRequestPath, "/") {
 			fullURL += "/"
 		}
-		fullURL += strings.TrimPrefix(requestPath, "/")
+		fullURL += strings.TrimPrefix(effectiveRequestPath, "/")
 		var curlHeaders []string
 		curlHeaders = append(curlHeaders, fmt.Sprintf(`-H "Authorization: Bearer %s"`, info.ApiKey))
 		curlHeaders = append(curlHeaders, `-H "Content-Type: application/json"`)
