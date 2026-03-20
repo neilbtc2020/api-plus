@@ -2,6 +2,8 @@ package model
 
 import (
 	"strings"
+
+	"github.com/QuantumNous/new-api/common"
 )
 
 type AvailabilityLogRow struct {
@@ -48,7 +50,7 @@ func GetEnabledChannelsByGroupModel(group string, modelName string) ([]*Channel,
 	err := DB.Table("channels").
 		Select("channels.*").
 		Joins("JOIN abilities ON abilities.channel_id = channels.id").
-		Where("abilities."+commonGroupCol+" = ? AND abilities.model = ? AND abilities.enabled = ? AND channels.status = ?", group, modelName, true, 1).
+		Where("abilities."+commonGroupCol+" = ? AND abilities.model = ? AND abilities.enabled = ? AND channels.status = ?", group, modelName, true, common.ChannelStatusEnabled).
 		Order("channels.priority DESC, channels.id DESC").
 		Find(&channels).Error
 	return channels, err
