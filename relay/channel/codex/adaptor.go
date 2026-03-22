@@ -122,6 +122,10 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 		return openai.OaiResponsesCompactionHandler(c, resp)
 	}
 
+	if info.RelayFormat == types.RelayFormatOpenAIResponsesCompaction {
+		return openai.OaiResponsesToCompactHandler(c, resp)
+	}
+
 	if info.IsStream || isEventStreamResponse {
 		return openai.OaiResponsesStreamHandler(c, info, resp)
 	}
