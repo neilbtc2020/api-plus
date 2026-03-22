@@ -29,6 +29,8 @@ const renderStatus = (status, t) => {
       return <Tag color='red'>{t('已禁用')}</Tag>;
     case 3:
       return <Tag color='yellow'>{t('自动禁用')}</Tag>;
+    case 4:
+      return <Tag color='red'>{t('安全禁用')}</Tag>;
     default:
       return <Tag color='grey'>{t('未知状态')}</Tag>;
   }

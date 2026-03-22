@@ -42,6 +42,7 @@ type testResult struct {
 	newAPIError  *types.NewAPIError
 	endpointType string // endpoint type used in this test (for caching)
 	testModel    string // model name used in this test (for caching)
+	responseBody []byte
 }
 
 func normalizeChannelTestEndpoint(channel *model.Channel, modelName, endpointType string) string {
@@ -559,7 +560,48 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 		newAPIError:  nil,
 		endpointType: endpointType,
 		testModel:    info.OriginModelName,
+		responseBody: respBody,
 	}
+}
+
+type channelAutoTestDecision struct {
+	newAPIError           *types.NewAPIError
+	shouldDisable         bool
+	shouldEnable          bool
+	shouldSecurityDisable bool
+	securityScan          *service.ChannelSecurityScanResult
+}
+
+func evaluateChannelAutoTest(channel *model.Channel, result testResult, milliseconds int64, disableThreshold int64) channelAutoTestDecision {
+	decision := channelAutoTestDecision{
+		newAPIError: result.newAPIError,
+	}
+
+	if result.newAPIError == nil {
+		scan := service.ScanChannelSecurity(result.responseBody)
+		if !scan.Safe {
+			decision.shouldSecurityDisable = true
+			decision.securityScan = &scan
+			return decision
+		}
+	}
+
+	if result.newAPIError != nil {
+		decision.shouldDisable = service.ShouldDisableChannel(channel.Type, result.newAPIError)
+	}
+
+	if common.AutomaticDisableChannelEnabled && !decision.shouldDisable && disableThreshold > 0 {
+		if milliseconds > disableThreshold {
+			err := fmt.Errorf("响应时间 %.2fs 超过阈值 %.2fs", float64(milliseconds)/1000.0, float64(disableThreshold)/1000.0)
+			decision.newAPIError = types.NewOpenAIError(err, types.ErrorCodeChannelResponseTimeExceeded, http.StatusRequestTimeout)
+			decision.shouldDisable = true
+		}
+	}
+
+	if channel.Status != common.ChannelStatusEnabled && !decision.shouldSecurityDisable {
+		decision.shouldEnable = service.ShouldEnableChannel(decision.newAPIError, channel.Status)
+	}
+	return decision
 }
 
 func coerceTestUsage(usageAny any, isStream bool, estimatePromptTokens int) (*dto.Usage, error) {
@@ -882,30 +924,17 @@ func testAllChannels(notify bool) error {
 			result := testChannel(channel, "", "", false)
 			tok := time.Now()
 			milliseconds := tok.Sub(tik).Milliseconds()
-
-			shouldBanChannel := false
-			newAPIError := result.newAPIError
-			// request error disables the channel
-			if newAPIError != nil {
-				shouldBanChannel = service.ShouldDisableChannel(channel.Type, result.newAPIError)
-			}
-
-			// 当错误检查通过，才检查响应时间
-			if common.AutomaticDisableChannelEnabled && !shouldBanChannel {
-				if milliseconds > disableThreshold {
-					err := fmt.Errorf("响应时间 %.2fs 超过阈值 %.2fs", float64(milliseconds)/1000.0, float64(disableThreshold)/1000.0)
-					newAPIError = types.NewOpenAIError(err, types.ErrorCodeChannelResponseTimeExceeded, http.StatusRequestTimeout)
-					shouldBanChannel = true
-				}
-			}
+			decision := evaluateChannelAutoTest(channel, result, milliseconds, disableThreshold)
 
 			// disable channel
-			if isChannelEnabled && shouldBanChannel && channel.GetAutoBan() {
-				processChannelError(result.context, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError)
+			if decision.shouldSecurityDisable && decision.securityScan != nil {
+				service.SecurityDisableChannel(channel, *decision.securityScan, "channel_auto_test")
+			} else if isChannelEnabled && decision.shouldDisable && channel.GetAutoBan() {
+				processChannelError(result.context, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.GetAutoBan()), decision.newAPIError)
 			}
 
 			// enable channel
-			if !isChannelEnabled && service.ShouldEnableChannel(newAPIError, channel.Status) {
+			if !isChannelEnabled && decision.shouldEnable {
 				service.EnableChannel(channel.Id, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.Name)
 			}
 

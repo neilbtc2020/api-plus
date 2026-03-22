@@ -179,6 +179,12 @@ const renderStatus = (status, channelInfo = undefined, t) => {
           {t('自动禁用')}
         </Tag>
       );
+    case 4:
+      return (
+        <Tag color='red' shape='circle'>
+          {t('安全禁用')}
+        </Tag>
+      );
     default:
       return (
         <Tag color='grey' shape='circle'>
@@ -206,6 +212,12 @@ const renderMultiKeyStatus = (status, keySize, enabledKeySize, t) => {
       return (
         <Tag color='yellow' shape='circle'>
           {t('自动禁用')} {enabledKeySize}/{keySize}
+        </Tag>
+      );
+    case 4:
+      return (
+        <Tag color='red' shape='circle'>
+          {t('安全禁用')} {enabledKeySize}/{keySize}
         </Tag>
       );
     default:
@@ -493,18 +505,37 @@ export const getChannelsColumns = ({
       title: t('状态'),
       dataIndex: 'status',
       render: (text, record, index) => {
-        if (text === 3) {
+        if (text === 3 || text === 4) {
           if (record.other_info === '') {
             record.other_info = '{}';
           }
           let otherInfo = JSON.parse(record.other_info);
-          let reason = otherInfo['status_reason'];
-          let time = otherInfo['status_time'];
+          let reason =
+            text === 4 ? otherInfo['security_reason'] : otherInfo['status_reason'];
+          let time =
+            text === 4
+              ? otherInfo['security_detected_at']
+              : otherInfo['status_time'];
+          let ruleIds = otherInfo['security_rule_ids'];
           return (
             <div>
               <Tooltip
                 content={
-                  t('原因：') + reason + t('，时间：') + timestamp2string(time)
+                  text === 4 ? (
+                    <div>
+                      <div>{t('安全原因：') + (reason || '-')}</div>
+                      <div>
+                        {t('命中规则：') +
+                          (Array.isArray(ruleIds) ? ruleIds.join(', ') : '-')}
+                      </div>
+                      <div>
+                        {t('检测时间：') +
+                          (time ? timestamp2string(time) : '-')}
+                      </div>
+                    </div>
+                  ) : (
+                    t('原因：') + reason + t('，时间：') + timestamp2string(time)
+                  )
                 }
               >
                 {renderStatus(text, record.channel_info, t)}

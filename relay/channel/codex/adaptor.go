@@ -116,11 +116,13 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 		return nil, types.NewError(errors.New("codex channel: endpoint not supported"), types.ErrorCodeInvalidRequest)
 	}
 
+	isEventStreamResponse := resp != nil && strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream")
+
 	if info.RelayMode == relayconstant.RelayModeResponsesCompact {
 		return openai.OaiResponsesCompactionHandler(c, resp)
 	}
 
-	if info.IsStream {
+	if info.IsStream || isEventStreamResponse {
 		return openai.OaiResponsesStreamHandler(c, info, resp)
 	}
 	return openai.OaiResponsesHandler(c, info, resp)

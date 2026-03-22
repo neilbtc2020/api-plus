@@ -346,6 +346,12 @@ const MultiKeyManageModal = ({ visible, onCancel, channel, onRefresh }) => {
             {t('自动禁用')}
           </Tag>
         );
+      case 4:
+        return (
+          <Tag color='red' shape='circle' size='small'>
+            {t('安全禁用')}
+          </Tag>
+        );
       default:
         return (
           <Tag color='grey' shape='circle' size='small'>
@@ -621,6 +627,9 @@ const MultiKeyManageModal = ({ visible, onCancel, channel, onRefresh }) => {
                             </Select.Option>
                             <Select.Option value={3}>
                               {t('自动禁用')}
+                            </Select.Option>
+                            <Select.Option value={4}>
+                              {t('安全禁用')}
                             </Select.Option>
                           </Select>
                         </Col>
