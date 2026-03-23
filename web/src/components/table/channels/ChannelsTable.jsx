@@ -28,6 +28,7 @@ import { getChannelsColumns } from './ChannelsColumnDefs';
 
 const ChannelsTable = (channelsData) => {
   const {
+    channels,
     displayChannels,
     loading,
     searching,
