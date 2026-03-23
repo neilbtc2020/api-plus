@@ -51,6 +51,21 @@ func TestValidateChannelXAIAccountTokenAllowsSparseUpdateWithoutKeyReplacement(t
 	require.NoError(t, err)
 }
 
+func TestValidateChannelXAIAccountTokenNormalizesWhitespaceOnlyUpdateKeyToEmpty(t *testing.T) {
+	t.Parallel()
+
+	channel := &model.Channel{
+		Type: constant.ChannelTypeXai,
+		Key:  " \n \t \n  ",
+	}
+	channel.SetOtherSettings(dto.ChannelOtherSettings{XAIAuthMode: dto.XAIAuthModeAccountToken})
+
+	err := validateChannel(channel, false)
+
+	require.NoError(t, err)
+	require.Empty(t, channel.Key)
+}
+
 func TestValidateChannelXAIAPIKeyKeepsExistingValidationBehavior(t *testing.T) {
 	t.Parallel()
 

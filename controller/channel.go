@@ -489,6 +489,9 @@ func validateChannel(channel *model.Channel, isAdd bool) error {
 		switch channel.GetOtherSettings().NormalizeXAIAuthMode() {
 		case dto.XAIAuthModeAccountToken:
 			trimmedKey := strings.TrimSpace(channel.Key)
+			if !isAdd && trimmedKey == "" {
+				channel.Key = ""
+			}
 			if isAdd || trimmedKey != "" {
 				tokens := strings.Split(channel.Key, "\n")
 				hasToken := false
