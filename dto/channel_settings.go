@@ -23,9 +23,17 @@ const (
 	AwsKeyTypeApiKey AwsKeyType = "api_key"
 )
 
+type XAIAuthMode string
+
+const (
+	XAIAuthModeAPIKey       XAIAuthMode = "api_key"
+	XAIAuthModeAccountToken XAIAuthMode = "account_token"
+)
+
 type ChannelOtherSettings struct {
 	AzureResponsesVersion                 string        `json:"azure_responses_version,omitempty"`
 	VertexKeyType                         VertexKeyType `json:"vertex_key_type,omitempty"` // "json" or "api_key"
+	XAIAuthMode                           XAIAuthMode   `json:"xai_auth_mode,omitempty"`
 	OpenRouterEnterprise                  *bool         `json:"openrouter_enterprise,omitempty"`
 	ClaudeBetaQuery                       bool          `json:"claude_beta_query,omitempty"`         // Claude 渠道是否强制追加 ?beta=true
 	AllowServiceTier                      bool          `json:"allow_service_tier,omitempty"`        // 是否允许 service_tier 透传（默认过滤以避免额外计费）
@@ -40,6 +48,15 @@ type ChannelOtherSettings struct {
 	UpstreamModelUpdateLastDetectedModels []string      `json:"upstream_model_update_last_detected_models,omitempty"` // 上次检测到的可加入模型
 	UpstreamModelUpdateLastRemovedModels  []string      `json:"upstream_model_update_last_removed_models,omitempty"`  // 上次检测到的可删除模型
 	UpstreamModelUpdateIgnoredModels      []string      `json:"upstream_model_update_ignored_models,omitempty"`       // 手动忽略的模型
+}
+
+func (s ChannelOtherSettings) NormalizeXAIAuthMode() XAIAuthMode {
+	switch s.XAIAuthMode {
+	case XAIAuthModeAccountToken:
+		return XAIAuthModeAccountToken
+	default:
+		return XAIAuthModeAPIKey
+	}
 }
 
 func (s *ChannelOtherSettings) IsOpenRouterEnterprise() bool {
