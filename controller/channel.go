@@ -488,16 +488,19 @@ func validateChannel(channel *model.Channel, isAdd bool) error {
 	if channel.Type == constant.ChannelTypeXai {
 		switch channel.GetOtherSettings().NormalizeXAIAuthMode() {
 		case dto.XAIAuthModeAccountToken:
-			tokens := strings.Split(channel.Key, "\n")
-			hasToken := false
-			for _, token := range tokens {
-				if strings.TrimSpace(token) != "" {
-					hasToken = true
-					break
+			trimmedKey := strings.TrimSpace(channel.Key)
+			if isAdd || trimmedKey != "" {
+				tokens := strings.Split(channel.Key, "\n")
+				hasToken := false
+				for _, token := range tokens {
+					if strings.TrimSpace(token) != "" {
+						hasToken = true
+						break
+					}
 				}
-			}
-			if !hasToken {
-				return fmt.Errorf("xAI account token requires at least one non-empty token")
+				if !hasToken {
+					return fmt.Errorf("xAI account token requires at least one non-empty token")
+				}
 			}
 		}
 	}

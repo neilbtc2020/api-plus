@@ -37,7 +37,35 @@ func TestValidateChannelXAIAccountTokenRejectsEffectivelyEmptyKey(t *testing.T) 
 	require.ErrorContains(t, err, "xAI account token")
 }
 
-func TestChannelOtherSettingsNormalizeXAIAuthMode(t *testing.T) {
+func TestValidateChannelXAIAccountTokenAllowsSparseUpdateWithoutKeyReplacement(t *testing.T) {
+	t.Parallel()
+
+	channel := &model.Channel{
+		Type: constant.ChannelTypeXai,
+		Key:  "",
+	}
+	channel.SetOtherSettings(dto.ChannelOtherSettings{XAIAuthMode: dto.XAIAuthModeAccountToken})
+
+	err := validateChannel(channel, false)
+
+	require.NoError(t, err)
+}
+
+func TestValidateChannelXAIAPIKeyKeepsExistingValidationBehavior(t *testing.T) {
+	t.Parallel()
+
+	channel := &model.Channel{
+		Type: constant.ChannelTypeXai,
+		Key:  " \n \t \n  ",
+	}
+	channel.SetOtherSettings(dto.ChannelOtherSettings{XAIAuthMode: dto.XAIAuthModeAPIKey})
+
+	err := validateChannel(channel, true)
+
+	require.NoError(t, err)
+}
+
+func TestNormalizeXAIAuthMode(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
