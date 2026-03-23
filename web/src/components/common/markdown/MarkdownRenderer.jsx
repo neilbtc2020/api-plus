@@ -21,13 +21,9 @@ import ReactMarkdown from 'react-markdown';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import './markdown.css';
-import RemarkMath from 'remark-math';
 import RemarkBreaks from 'remark-breaks';
-import RehypeKatex from 'rehype-katex';
 import RemarkGfm from 'remark-gfm';
-import RehypeHighlight from 'rehype-highlight';
 import { useRef, useState, useEffect, useMemo } from 'react';
-import mermaid from 'mermaid';
 import React from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 import clsx from 'clsx';
@@ -36,28 +32,60 @@ import { copy, rehypeSplitWordsIntoSpans } from '../../../helpers';
 import { IconCopy } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'default',
-  securityLevel: 'loose',
-});
+let mermaidInitialized = false;
+
+const scheduleIdleTask = (task) => {
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    const id = window.requestIdleCallback(task);
+    return () => window.cancelIdleCallback(id);
+  }
+  const id = window.setTimeout(task, 0);
+  return () => window.clearTimeout(id);
+};
+
+const MARKDOWN_PATTERNS = {
+  math: /(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$|\\\([\s\S]+?\\\)|\\\[[\s\S]+?\\\])/,
+  codeBlock: /```[\s\S]*?```|`[^`\n]+`/,
+};
 
 export function Mermaid(props) {
   const ref = useRef(null);
   const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
-    if (props.code && ref.current) {
-      mermaid
-        .run({
+    if (!props.code || !ref.current) return;
+
+    let cancelled = false;
+
+    const cancelIdle = scheduleIdleTask(async () => {
+      try {
+        const mermaidModule = await import('mermaid');
+        const mermaid = mermaidModule.default || mermaidModule;
+        if (!mermaidInitialized) {
+          mermaid.initialize({
+            startOnLoad: false,
+            theme: 'default',
+            securityLevel: 'loose',
+          });
+          mermaidInitialized = true;
+        }
+        if (cancelled || !ref.current) return;
+        await mermaid.run({
           nodes: [ref.current],
           suppressErrors: true,
-        })
-        .catch((e) => {
+        });
+      } catch (e) {
+        if (!cancelled) {
           setHasError(true);
           console.error('[Mermaid] ', e.message);
-        });
-    }
+        }
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      cancelIdle();
+    };
   }, [props.code]);
 
   function viewSvgInNewWindow() {
@@ -390,29 +418,101 @@ function _MarkdownContent(props) {
     return tryWrapHtmlCode(escapeBrackets(content));
   }, [content]);
 
+  const needsMath = useMemo(
+    () => MARKDOWN_PATTERNS.math.test(escapedContent),
+    [escapedContent],
+  );
+  const needsHighlight = useMemo(
+    () => MARKDOWN_PATTERNS.codeBlock.test(escapedContent),
+    [escapedContent],
+  );
+
+  const [dynamicPlugins, setDynamicPlugins] = useState({
+    remarkMath: null,
+    rehypeKatex: null,
+    rehypeHighlight: null,
+  });
+
   // 判断是否为用户消息
   const isUserMessage = className && className.includes('user-message');
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const cancelIdle = scheduleIdleTask(async () => {
+      const nextPlugins = {};
+
+      if (needsMath && !dynamicPlugins.remarkMath) {
+        const [remarkMathModule, rehypeKatexModule] = await Promise.all([
+          import('remark-math'),
+          import('rehype-katex'),
+        ]);
+        nextPlugins.remarkMath = remarkMathModule.default || remarkMathModule;
+        nextPlugins.rehypeKatex =
+          rehypeKatexModule.default || rehypeKatexModule;
+      }
+
+      if (needsHighlight && !dynamicPlugins.rehypeHighlight) {
+        const rehypeHighlightModule = await import('rehype-highlight');
+        nextPlugins.rehypeHighlight =
+          rehypeHighlightModule.default || rehypeHighlightModule;
+      }
+
+      if (!cancelled && Object.keys(nextPlugins).length > 0) {
+        setDynamicPlugins((prev) => ({
+          ...prev,
+          ...nextPlugins,
+        }));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      cancelIdle();
+    };
+  }, [
+    dynamicPlugins.remarkMath,
+    dynamicPlugins.rehypeHighlight,
+    needsHighlight,
+    needsMath,
+  ]);
+
+  const remarkPlugins = useMemo(() => {
+    const plugins = [RemarkGfm, RemarkBreaks];
+    if (dynamicPlugins.remarkMath) {
+      plugins.unshift(dynamicPlugins.remarkMath);
+    }
+    return plugins;
+  }, [dynamicPlugins.remarkMath]);
+
   const rehypePluginsBase = useMemo(() => {
-    const base = [
-      RehypeKatex,
-      [
-        RehypeHighlight,
+    const base = [];
+    if (dynamicPlugins.rehypeKatex) {
+      base.push(dynamicPlugins.rehypeKatex);
+    }
+    if (dynamicPlugins.rehypeHighlight) {
+      base.push([
+        dynamicPlugins.rehypeHighlight,
         {
           detect: false,
           ignoreMissing: true,
         },
-      ],
-    ];
+      ]);
+    }
     if (animated) {
       base.push([rehypeSplitWordsIntoSpans, { previousContentLength }]);
     }
     return base;
-  }, [animated, previousContentLength]);
+  }, [
+    animated,
+    dynamicPlugins.rehypeHighlight,
+    dynamicPlugins.rehypeKatex,
+    previousContentLength,
+  ]);
 
   return (
     <ReactMarkdown
-      remarkPlugins={[RemarkMath, RemarkGfm, RemarkBreaks]}
+      remarkPlugins={remarkPlugins}
       rehypePlugins={rehypePluginsBase}
       components={{
         pre: PreCode,
