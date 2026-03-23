@@ -74,3 +74,14 @@ func TestEvaluateChannelAutoTestKeepsOrdinaryAutoDisable(t *testing.T) {
 	require.True(t, decision.shouldDisable)
 	require.False(t, decision.shouldSecurityDisable)
 }
+
+func TestShouldSkipChannelForTestRunMode(t *testing.T) {
+	t.Parallel()
+
+	channel := &model.Channel{SkipAutoTest: true}
+
+	require.True(t, shouldSkipChannelForTestRun(channel, channelTestRunModeAuto))
+	require.False(t, shouldSkipChannelForTestRun(channel, channelTestRunModeManual))
+	require.False(t, shouldSkipChannelForTestRun(&model.Channel{SkipAutoTest: false}, channelTestRunModeAuto))
+	require.True(t, shouldSkipChannelForTestRun(&model.Channel{Status: common.ChannelStatusManuallyDisabled, SkipAutoTest: true}, channelTestRunModeManual))
+}

@@ -265,6 +265,21 @@ const renderResponseTime = (responseTime, t) => {
   }
 };
 
+const renderSkipAutoTest = (skipAutoTest, record, t) => {
+  if (record?.children !== undefined) {
+    return null;
+  }
+  return skipAutoTest ? (
+    <Tag color='orange' shape='circle'>
+      {t('已跳过')}
+    </Tag>
+  ) : (
+    <Tag color='grey' shape='circle'>
+      {t('未跳过')}
+    </Tag>
+  );
+};
+
 const isRequestPassThroughEnabled = (record) => {
   if (!record || record.children !== undefined) {
     return false;
@@ -546,6 +561,12 @@ export const getChannelsColumns = ({
           return renderStatus(text, record.channel_info, t);
         }
       },
+    },
+    {
+      key: COLUMN_KEYS.SKIP_AUTO_TEST,
+      title: t('跳过定时测试'),
+      dataIndex: 'skip_auto_test',
+      render: (text, record) => renderSkipAutoTest(text, record, t),
     },
     {
       key: COLUMN_KEYS.RESPONSE_TIME,

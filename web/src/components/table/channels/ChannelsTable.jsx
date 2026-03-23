@@ -28,7 +28,7 @@ import { getChannelsColumns } from './ChannelsColumnDefs';
 
 const ChannelsTable = (channelsData) => {
   const {
-    channels,
+    displayChannels,
     loading,
     searching,
     activePage,
@@ -134,7 +134,7 @@ const ChannelsTable = (channelsData) => {
   return (
     <CardTable
       columns={tableColumns}
-      dataSource={channels}
+      dataSource={displayChannels}
       scroll={compactMode ? undefined : { x: 'max-content' }}
       pagination={{
         currentPage: activePage,

@@ -182,6 +182,7 @@ const EditChannelModal = (props) => {
     status_code_mapping: '',
     models: [],
     auto_ban: 1,
+    skip_auto_test: false,
     test_model: '',
     groups: ['default'],
     priority: 0,
@@ -941,6 +942,8 @@ const EditChannelModal = (props) => {
         data.upstream_model_update_last_detected_models = [];
         data.upstream_model_update_ignored_models = '';
       }
+
+      data.skip_auto_test = data.skip_auto_test === true;
 
       if (
         data.type === 45 &&
@@ -3469,6 +3472,19 @@ const EditChannelModal = (props) => {
                         '仅当自动禁用开启时有效，关闭后不会自动禁用该渠道',
                       )}
                       initValue={autoBan}
+                    />
+
+                    <Form.Switch
+                      field='skip_auto_test'
+                      label={t('跳过定时测试')}
+                      checkedText={t('开')}
+                      uncheckedText={t('关')}
+                      onChange={(value) =>
+                        handleInputChange('skip_auto_test', value)
+                      }
+                      extraText={t(
+                        '开启后，该通道不会参与定时自动测试，但仍可手动测试',
+                      )}
                     />
 
                     <Form.Switch

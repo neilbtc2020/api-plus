@@ -74,6 +74,9 @@ export const useChannelsData = () => {
   const [statusFilter, setStatusFilter] = useState(
     localStorage.getItem('channel-status-filter') || 'all',
   );
+  const [autoTestFilter, setAutoTestFilter] = useState(
+    localStorage.getItem('channel-auto-test-filter') || 'all',
+  );
 
   // Type tabs states
   const [activeTypeKey, setActiveTypeKey] = useState('all');
@@ -140,6 +143,7 @@ export const useChannelsData = () => {
     GROUP: 'group',
     TYPE: 'type',
     STATUS: 'status',
+    SKIP_AUTO_TEST: 'skip_auto_test',
     RESPONSE_TIME: 'response_time',
     BALANCE: 'balance',
     PRIORITY: 'priority',
@@ -180,6 +184,7 @@ export const useChannelsData = () => {
       [COLUMN_KEYS.GROUP]: true,
       [COLUMN_KEYS.TYPE]: true,
       [COLUMN_KEYS.STATUS]: true,
+      [COLUMN_KEYS.SKIP_AUTO_TEST]: true,
       [COLUMN_KEYS.RESPONSE_TIME]: true,
       [COLUMN_KEYS.BALANCE]: true,
       [COLUMN_KEYS.PRIORITY]: true,
@@ -1170,9 +1175,49 @@ export const useChannelsData = () => {
     return keys;
   }, [channelTypeCounts]);
 
+  const displayChannels = useMemo(() => {
+    if (autoTestFilter === 'all') {
+      return channels;
+    }
+
+    const shouldKeepChannel = (channel) => {
+      const skipped = channel?.skip_auto_test === true;
+      if (autoTestFilter === 'skipped') {
+        return skipped;
+      }
+      if (autoTestFilter === 'not_skipped') {
+        return !skipped;
+      }
+      return true;
+    };
+
+    if (!enableTagMode) {
+      return channels.filter(shouldKeepChannel);
+    }
+
+    return channels
+      .map((channel) => {
+        if (channel.children === undefined) {
+          return shouldKeepChannel(channel) ? channel : null;
+        }
+
+        const filteredChildren = channel.children.filter(shouldKeepChannel);
+        if (filteredChildren.length === 0) {
+          return null;
+        }
+
+        return {
+          ...channel,
+          children: filteredChildren,
+        };
+      })
+      .filter(Boolean);
+  }, [autoTestFilter, channels, enableTagMode]);
+
   return {
     // Basic states
     channels,
+    displayChannels,
     loading,
     searching,
     activePage,
@@ -1183,6 +1228,7 @@ export const useChannelsData = () => {
     enableTagMode,
     enableBatchDelete,
     statusFilter,
+    autoTestFilter,
     compactMode,
     globalPassThroughEnabled,
     showChannelHealthModal,
@@ -1295,6 +1341,7 @@ export const useChannelsData = () => {
     setEnableTagMode,
     setEnableBatchDelete,
     setStatusFilter,
+    setAutoTestFilter,
     setCompactMode,
     setActivePage,
   };

@@ -49,6 +49,8 @@ const ChannelsActions = ({
   setEnableTagMode,
   statusFilter,
   setStatusFilter,
+  autoTestFilter,
+  setAutoTestFilter,
   getFormValues,
   loadChannels,
   searchChannels,
@@ -318,6 +320,25 @@ const ChannelsActions = ({
               <Select.Option value='all'>{t('全部')}</Select.Option>
               <Select.Option value='enabled'>{t('已启用')}</Select.Option>
               <Select.Option value='disabled'>{t('已禁用')}</Select.Option>
+            </Select>
+          </div>
+
+          <div className='flex items-center justify-between w-full md:w-auto'>
+            <Typography.Text strong className='mr-2'>
+              {t('定时测试筛选')}
+            </Typography.Text>
+            <Select
+              size='small'
+              value={autoTestFilter}
+              onChange={(v) => {
+                localStorage.setItem('channel-auto-test-filter', v);
+                setAutoTestFilter(v);
+                setActivePage(1);
+              }}
+            >
+              <Select.Option value='all'>{t('全部')}</Select.Option>
+              <Select.Option value='skipped'>{t('已跳过')}</Select.Option>
+              <Select.Option value='not_skipped'>{t('未跳过')}</Select.Option>
             </Select>
           </div>
         </div>

@@ -890,7 +890,24 @@ func TestChannel(c *gin.Context) {
 var testAllChannelsLock sync.Mutex
 var testAllChannelsRunning bool = false
 
-func testAllChannels(notify bool) error {
+type channelTestRunMode string
+
+const (
+	channelTestRunModeManual channelTestRunMode = "manual"
+	channelTestRunModeAuto   channelTestRunMode = "auto"
+)
+
+func shouldSkipChannelForTestRun(channel *model.Channel, runMode channelTestRunMode) bool {
+	if channel == nil {
+		return true
+	}
+	if channel.Status == common.ChannelStatusManuallyDisabled {
+		return true
+	}
+	return runMode == channelTestRunModeAuto && channel.SkipAutoTest
+}
+
+func testAllChannels(notify bool, runMode channelTestRunMode) error {
 
 	testAllChannelsLock.Lock()
 	if testAllChannelsRunning {
@@ -916,7 +933,7 @@ func testAllChannels(notify bool) error {
 		}()
 
 		for _, channel := range channels {
-			if channel.Status == common.ChannelStatusManuallyDisabled {
+			if shouldSkipChannelForTestRun(channel, runMode) {
 				continue
 			}
 			isChannelEnabled := channel.Status == common.ChannelStatusEnabled
@@ -955,7 +972,7 @@ func testAllChannels(notify bool) error {
 }
 
 func TestAllChannels(c *gin.Context) {
-	err := testAllChannels(true)
+	err := testAllChannels(true, channelTestRunModeManual)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -984,7 +1001,7 @@ func AutomaticallyTestChannels() {
 				time.Sleep(time.Duration(int(math.Round(frequency))) * time.Minute)
 				common.SysLog(fmt.Sprintf("automatically test channels with interval %f minutes", frequency))
 				common.SysLog("automatically testing all channels")
-				_ = testAllChannels(false)
+				_ = testAllChannels(false, channelTestRunModeAuto)
 				common.SysLog("automatically channel test finished")
 				if !operation_setting.GetMonitorSetting().AutoTestChannelEnabled {
 					break
