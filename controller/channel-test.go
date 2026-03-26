@@ -932,35 +932,64 @@ func testAllChannels(notify bool, runMode channelTestRunMode) error {
 			testAllChannelsLock.Unlock()
 		}()
 
+		// 统计各状态渠道数量
+		statusCount := make(map[int]int)
+		for _, ch := range channels {
+			statusCount[ch.Status]++
+		}
+		common.SysLog(fmt.Sprintf("auto test: total channels=%d, enabled=%d, auto_disabled=%d, manually_disabled=%d, security_disabled=%d",
+			len(channels), statusCount[common.ChannelStatusEnabled], statusCount[common.ChannelStatusAutoDisabled],
+			statusCount[common.ChannelStatusManuallyDisabled], statusCount[common.ChannelStatusSecurityDisabled]))
+
 		for _, channel := range channels {
 			if shouldSkipChannelForTestRun(channel, runMode) {
+				common.SysLog(fmt.Sprintf("auto test: skipping channel #%d「%s」(status=%d, skip_auto_test=%v)",
+					channel.Id, channel.Name, channel.Status, channel.SkipAutoTest))
 				continue
 			}
-			isChannelEnabled := channel.Status == common.ChannelStatusEnabled
-			tik := time.Now()
-			result := testChannel(channel, "", "", false)
-			tok := time.Now()
-			milliseconds := tok.Sub(tik).Milliseconds()
-			decision := evaluateChannelAutoTest(channel, result, milliseconds, disableThreshold)
+			func(channel *model.Channel) {
+				defer func() {
+					if r := recover(); r != nil {
+						common.SysError(fmt.Sprintf("auto test: panic testing channel #%d「%s」: %v", channel.Id, channel.Name, r))
+					}
+				}()
 
-			// disable channel
-			if decision.shouldSecurityDisable && decision.securityScan != nil {
-				service.SecurityDisableChannel(channel, *decision.securityScan, "channel_auto_test")
-			} else if isChannelEnabled && decision.shouldDisable && channel.GetAutoBan() {
-				processChannelError(result.context, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.GetAutoBan()), decision.newAPIError)
-			}
+				common.SysLog(fmt.Sprintf("auto test: testing channel #%d「%s」(status=%d)",
+					channel.Id, channel.Name, channel.Status))
+				isChannelEnabled := channel.Status == common.ChannelStatusEnabled
+				tik := time.Now()
+				result := testChannel(channel, "", "", false)
+				tok := time.Now()
+				milliseconds := tok.Sub(tik).Milliseconds()
+				decision := evaluateChannelAutoTest(channel, result, milliseconds, disableThreshold)
 
-			// enable channel
-			if !isChannelEnabled && decision.shouldEnable {
-				service.EnableChannel(channel.Id, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.Name)
-			}
+				if result.localErr != nil {
+					common.SysLog(fmt.Sprintf("auto test: channel #%d「%s」test error: %v",
+						channel.Id, channel.Name, result.localErr))
+				} else {
+					common.SysLog(fmt.Sprintf("auto test: channel #%d「%s」test success (%.2fs), shouldEnable=%v shouldDisable=%v",
+						channel.Id, channel.Name, float64(milliseconds)/1000.0, decision.shouldEnable, decision.shouldDisable))
+				}
 
-			// Cache tested endpoint on success (refresh on each auto-test cycle)
-			if result.newAPIError == nil && result.endpointType != "" && result.testModel != "" {
-				model.SetChannelEndpoint(channel.Id, result.testModel, result.endpointType)
-			}
+				// disable channel
+				if decision.shouldSecurityDisable && decision.securityScan != nil {
+					service.SecurityDisableChannel(channel, *decision.securityScan, "channel_auto_test")
+				} else if isChannelEnabled && decision.shouldDisable && channel.GetAutoBan() {
+					processChannelError(result.context, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.GetAutoBan()), decision.newAPIError)
+				}
 
-			channel.UpdateResponseTime(milliseconds)
+				// enable channel
+				if !isChannelEnabled && decision.shouldEnable {
+					service.EnableChannel(channel.Id, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.Name)
+				}
+
+				// Cache tested endpoint on success (refresh on each auto-test cycle)
+				if result.newAPIError == nil && result.endpointType != "" && result.testModel != "" {
+					model.SetChannelEndpoint(channel.Id, result.testModel, result.endpointType)
+				}
+
+				channel.UpdateResponseTime(milliseconds)
+			}(channel)
 			time.Sleep(common.RequestInterval)
 		}
 
